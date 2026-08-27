@@ -1,0 +1,5 @@
+-- Using bcrypt hash for 'password'
+INSERT INTO users (name, email, password, role) VALUES
+('Admin User', 'admin@finsight.com', '$2a$10$wT0/K5.K.B4m.hC9x4.3L.nK31I/A4G7.F94Y67tZ9jV80xO7Qo1u', 'ADMIN'),
+('Analyst User', 'analyst@finsight.com', '$2a$10$wT0/K5.K.B4m.hC9x4.3L.nK31I/A4G7.F94Y67tZ9jV80xO7Qo1u', 'ANALYST'),
+('Viewer User', 'viewer@finsight.com', '$2a$10$wT0/K5.K.B4m.hC9x4.3L.nK31I/A4G7.F94Y67tZ9jV80xO7Qo1u', 'VIEWER');

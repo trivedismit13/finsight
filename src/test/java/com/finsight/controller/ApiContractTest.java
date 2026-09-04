@@ -1,8 +1,8 @@
 package com.finsight.controller;
 
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Expense;
 import com.finsight.model.User;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,40 +28,39 @@ public class ApiContractTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private FinancialRecordRepository recordRepository;
+    private ExpenseRepository recordRepository;
 
     @Autowired
     private UserRepository userRepository;
 
-    private Long recordId;
+    private Long expenseId;
 
     @BeforeEach
     void setUp() {
         recordRepository.deleteAll();
 
-        User testUser = userRepository.findByEmail("admin@example.com").orElseGet(() -> {
+        User testUser = userRepository.findByEmail("finance_admin@example.com").orElseGet(() -> {
             User u = new User();
-            u.setEmail("admin@example.com");
+            u.setEmail("finance_admin@example.com");
             u.setPassword("password");
             u.setName("Admin User");
-            u.setRole(com.finsight.model.Role.ADMIN);
+            u.setRole(com.finsight.model.Role.FINANCE_ADMIN);
             return userRepository.save(u);
         });
 
-        FinancialRecord r = new FinancialRecord();
+        Expense r = new Expense();
         r.setAmount(new BigDecimal("100.00"));
-        r.setType("EXPENSE");
-        r.setCategory("Food");
-        r.setRecordDate(LocalDate.now());
+        r.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        r.setExpenseDate(LocalDate.now());
         r.setCreatedBy(testUser);
         r = recordRepository.save(r);
-        recordId = r.getRecordId();
+        expenseId = r.getExpenseId();
     }
 
     @Test
-    @com.finsight.security.WithMockCustomUser(username = "admin@example.com", roles = "ADMIN")
+    @com.finsight.security.WithMockCustomUser(username = "finance_admin@example.com", roles = "FINANCE_ADMIN")
     public void testDeleteRecordReturns204NoContent() throws Exception {
-        mockMvc.perform(delete("/api/records/" + recordId))
+        mockMvc.perform(delete("/api/records/" + expenseId))
                 .andExpect(status().isNoContent()); // HTTP 204
     }
 }

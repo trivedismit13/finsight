@@ -1,9 +1,9 @@
 package com.finsight.service;
 
-import com.finsight.model.CategoryBudget;
+import com.finsight.model.Budget;
 import com.finsight.model.User;
-import com.finsight.repository.CategoryBudgetRepository;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.BudgetRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,17 +16,17 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 public class BudgetService {
-    private final CategoryBudgetRepository budgetRepository;
+    private final BudgetRepository budgetRepository;
     private final UserRepository userRepository;
-    private final FinancialRecordRepository recordRepository;
+    private final ExpenseRepository recordRepository;
     private final NotificationDispatcherService notificationDispatcherService;
 
     @Transactional
     @PreAuthorize("hasRole('ADMIN')")
-    public CategoryBudget createOrUpdateBudget(Long adminId, String category, String monthYear, BigDecimal limit) {
+    public Budget createOrUpdateBudget(Long adminId, String category, String monthYear, BigDecimal limit) {
         User admin = userRepository.findById(adminId).orElseThrow();
-        CategoryBudget budget = budgetRepository.findByCategoryAndMonthYear(category, monthYear)
-                .orElse(new CategoryBudget());
+        Budget budget = budgetRepository.findByCategoryAndMonthYear(category, monthYear)
+                .orElse(new Budget());
 
         budget.setCategory(category);
         budget.setMonthYear(monthYear);
@@ -37,7 +37,7 @@ public class BudgetService {
         java.time.YearMonth ym = java.time.YearMonth.parse(monthYear);
         java.time.LocalDate startDate = ym.atDay(1);
         java.time.LocalDate endDateExclusive = ym.plusMonths(1).atDay(1);
-        BigDecimal totalSpent = recordRepository.sumExpensesByCategoryAndDateRange(category, startDate, endDateExclusive);
+        BigDecimal totalSpent = recordRepository.sumExpensesByCategoryAndDateRange(com.finsight.model.ExpenseCategory.valueOf(category), startDate, endDateExclusive);
         if (totalSpent.compareTo(limit) <= 0) {
             budget.setAlertSent(false);
         }
@@ -54,11 +54,11 @@ public class BudgetService {
      * Checks whether actual spending for the given category/month exceeds the budget.
      * Called both after budget creation and after every new EXPENSE record is created.
      */
-    public void checkBudgetExceeded(CategoryBudget budget, Long notifyUserId) {
+    public void checkBudgetExceeded(Budget budget, Long notifyUserId) {
         java.time.YearMonth ym = java.time.YearMonth.parse(budget.getMonthYear());
         java.time.LocalDate startDate = ym.atDay(1);
         java.time.LocalDate endDateExclusive = ym.plusMonths(1).atDay(1);
-        BigDecimal totalSpent = recordRepository.sumExpensesByCategoryAndDateRange(budget.getCategory(), startDate, endDateExclusive);
+        BigDecimal totalSpent = recordRepository.sumExpensesByCategoryAndDateRange(com.finsight.model.ExpenseCategory.valueOf(budget.getCategory()), startDate, endDateExclusive);
         if (totalSpent.compareTo(budget.getBudgetAmount()) > 0) {
             // Use atomic update to prevent duplicate alerts from concurrent expenses
             int updated = budgetRepository.markAlertSentIfFalse(budget.getBudgetId());
@@ -83,10 +83,10 @@ public class BudgetService {
 
     /**
      * Looks up the active budget for a category/month and checks if the given spending exceeds it.
-     * Triggered from FinancialRecordService after an EXPENSE record is created.
+     * Triggered from ExpenseService after an EXPENSE record is created.
      */
     public void checkBudgetExceededAfterRecord(String category, String monthYear, Long notifyUserId) {
-        Optional<CategoryBudget> budgetOpt = budgetRepository.findByCategoryAndMonthYear(category, monthYear);
+        Optional<Budget> budgetOpt = budgetRepository.findByCategoryAndMonthYear(category, monthYear);
         budgetOpt.ifPresent(budget ->
                 checkBudgetExceeded(budget, notifyUserId)
         );

@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class ReportFailureInjectionTest {
@@ -60,7 +60,7 @@ public class ReportFailureInjectionTest {
         user.setName("Report Test User");
         user.setEmail("reporttest@example.com");
         user.setPassword("password");
-        user.setRole(com.finsight.model.Role.ANALYST);
+        user.setRole(com.finsight.model.Role.MANAGER);
         testUser = userRepository.save(user);
     }
 

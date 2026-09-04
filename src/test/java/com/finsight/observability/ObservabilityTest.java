@@ -51,7 +51,7 @@ public class ObservabilityTest {
     private com.finsight.service.EmailProviderService emailProviderService;
 
     @Autowired
-    private com.finsight.repository.FinancialRecordRepository financialRecordRepository;
+    private com.finsight.repository.ExpenseRepository expenseRepository;
 
     private User testUser;
 
@@ -61,7 +61,7 @@ public class ObservabilityTest {
         u.setName("Test User");
         u.setEmail("testobs_" + UUID.randomUUID().toString() + "@example.com");
         u.setPassword("password");
-        u.setRole(com.finsight.model.Role.VIEWER);
+        u.setRole(com.finsight.model.Role.EMPLOYEE);
         testUser = userRepository.save(u);
     }
 
@@ -80,7 +80,7 @@ public class ObservabilityTest {
                 .andExpect(status().isUnauthorized()); // Or 404 depending on how Spring handles unmapped vs secured
 
         mockMvc.perform(get("/actuator/env")
-                .with(user("admin@example.com").roles("ADMIN")))
+                .with(user("finance_admin@example.com").roles("FINANCE_ADMIN")))
                 .andExpect(status().isNotFound()); // If not exposed, it throws NoResourceFoundException which is mapped to 404
     }
 
@@ -94,7 +94,7 @@ public class ObservabilityTest {
         
         mockMvc.perform(get("/api/reports/export/1/download")
                 .header("X-Correlation-Id", customCorrelation)
-                .with(user(testUser.getEmail()).roles("VIEWER")));
+                .with(user(testUser.getEmail()).roles("EMPLOYEE")));
                 
         assertNull(MDC.get(MdcLoggingFilter.TRACE_ID_KEY), "MDC traceId must be cleared after request");
         assertNull(MDC.get(MdcLoggingFilter.CORRELATION_ID_KEY), "MDC correlationId must be cleared after request");

@@ -1,5 +1,5 @@
 package com.finsight.model;
 
 public enum Role {
-    VIEWER, ANALYST, ADMIN
+    EMPLOYEE, MANAGER, FINANCE_ADMIN
 }

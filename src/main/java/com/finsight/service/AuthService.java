@@ -47,8 +47,8 @@ public class AuthService {
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        // Role is ALWAYS VIEWER on self-registration — cannot be overridden by client input
-        user.setRole(Role.VIEWER);
+        // Role is ALWAYS EMPLOYEE on self-registration — cannot be overridden by client input
+        user.setRole(Role.EMPLOYEE);
 
         userRepository.save(user);
 

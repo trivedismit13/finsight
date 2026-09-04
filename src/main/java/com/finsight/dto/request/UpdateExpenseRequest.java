@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
 @Data
-public class UpdateRecordRequest {
+public class UpdateExpenseRequest {
     @jakarta.validation.constraints.NotNull
     @jakarta.validation.constraints.DecimalMin(value = "0.01")
     @jakarta.validation.constraints.DecimalMax(value = "9999999999999.99")
@@ -19,7 +19,7 @@ public class UpdateRecordRequest {
     @NotBlank
     private String category;
     @jakarta.validation.constraints.NotNull
-    private LocalDate recordDate;
+    private LocalDate expenseDate;
     private String description;
     // Client must send back the version they read — Hibernate uses this for optimistic lock checking
     private Long version;

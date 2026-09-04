@@ -1,12 +1,12 @@
 package com.finsight.service;
 
-import com.finsight.dto.request.CreateRecordRequest;
-import com.finsight.dto.request.UpdateRecordRequest;
-import com.finsight.dto.response.RecordResponse;
+import com.finsight.dto.request.CreateExpenseRequest;
+import com.finsight.dto.request.UpdateExpenseRequest;
+import com.finsight.dto.response.ExpenseResponse;
 import com.finsight.exception.ResourceNotFoundException;
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Expense;
 import com.finsight.model.User;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,15 +26,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-public class FinancialRecordServiceTest {
+public class ExpenseServiceTest {
 
-    @Mock private FinancialRecordRepository recordRepository;
+    @Mock private ExpenseRepository recordRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private BudgetService budgetService;
 
     @InjectMocks
-    private FinancialRecordService recordService;
+    private ExpenseService recordService;
 
     private User testUser;
 
@@ -55,14 +55,15 @@ public class FinancialRecordServiceTest {
      */
     @Test
     void testConcurrentUpdate_optimisticLock_secondWriterGetsConflict() {
-        FinancialRecord record = new FinancialRecord();
-        record.setRecordId(10L);
+        Expense record = new Expense();
+        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        record.setExpenseId(10L);
         record.setVersion(1L); // DB is at version 1 (first writer already committed)
         record.setCreatedBy(testUser);
 
         when(recordRepository.findByIdAndIsDeletedFalse(10L)).thenReturn(Optional.of(record));
 
-        UpdateRecordRequest req = new UpdateRecordRequest();
+        UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(0L); // Client still has the old version=0
 
         // Should throw because 1 (DB) != 0 (client)
@@ -81,21 +82,20 @@ public class FinancialRecordServiceTest {
     @Test
     void testIdempotentCreate_duplicateKeyReturnsExistingRecord() {
         String key = "abc-123";
-        FinancialRecord existing = new FinancialRecord();
-        existing.setRecordId(99L);
+        Expense existing = new Expense();
+        existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        existing.setExpenseId(99L);
         existing.setIdempotencyKey(key);
         existing.setCreatedBy(testUser);
         existing.setAmount(BigDecimal.valueOf(100));
-        existing.setType("EXPENSE");
-        existing.setCategory("Food");
-        existing.setRecordDate(LocalDate.of(2026, 8, 18));
+        existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        existing.setExpenseDate(LocalDate.of(2026, 8, 18));
 
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setIdempotencyKey(key);
         req.setAmount(BigDecimal.valueOf(100));
-        req.setType("EXPENSE");
-        req.setCategory("Food");
-        req.setRecordDate(LocalDate.of(2026, 8, 18));
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         // First call: key not found (race window); save throws; second lookup finds it
@@ -104,11 +104,11 @@ public class FinancialRecordServiceTest {
                 .thenReturn(Optional.of(existing)); // after DataIntegrityViolationException
         when(recordRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        RecordResponse result = recordService.createRecord(req, 1L);
+        ExpenseResponse result = recordService.createRecord(req, 1L);
 
-        assertEquals(99L, result.getRecordId());
+        assertEquals(99L, result.getExpenseId());
         // Only one save attempt was made
-        verify(recordRepository, times(1)).saveAndFlush(any(FinancialRecord.class));
+        verify(recordRepository, times(1)).saveAndFlush(any(Expense.class));
     }
 
     /**
@@ -118,24 +118,24 @@ public class FinancialRecordServiceTest {
      */
     @Test
     void testUpdateRecord_matchingVersion_succeeds() {
-        FinancialRecord record = new FinancialRecord();
-        record.setRecordId(5L);
+        Expense record = new Expense();
+        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        record.setExpenseId(5L);
         record.setVersion(2L);
         record.setCreatedBy(testUser);
         record.setAmount(BigDecimal.valueOf(100));
-        record.setCategory("Food");
+        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
 
         when(recordRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(record));
         when(recordRepository.save(any())).thenReturn(record);
 
-        UpdateRecordRequest req = new UpdateRecordRequest();
+        UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(2L); // matches DB version
         req.setAmount(BigDecimal.valueOf(200));
-        req.setType("EXPENSE");
-        req.setCategory("Transport");
-        req.setRecordDate(LocalDate.of(2026, 8, 18));
+        req.setCategory(com.finsight.model.ExpenseCategory.TRANSPORT.name());
+        req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
-        RecordResponse result = recordService.updateRecord(5L, req, 1L);
+        ExpenseResponse result = recordService.updateRecord(5L, req, 1L);
 
         assertNotNull(result);
         verify(auditLogService).record(eq(1L), eq("UPDATE_RECORD"), eq("RECORD"), eq(5L), anyString());
@@ -150,7 +150,7 @@ public class FinancialRecordServiceTest {
     void testUpdateRecord_nonExistentId_throwsResourceNotFoundException() {
         when(recordRepository.findByIdAndIsDeletedFalse(999L)).thenReturn(Optional.empty());
 
-        UpdateRecordRequest req = new UpdateRecordRequest();
+        UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(0L);
 
         assertThrows(ResourceNotFoundException.class,
@@ -160,49 +160,47 @@ public class FinancialRecordServiceTest {
     @Test
     void testIdempotentCreate_sameKeySamePayload_returnsExistingRecord() {
         String key = "ABC";
-        FinancialRecord existing = new FinancialRecord();
-        existing.setRecordId(100L);
+        Expense existing = new Expense();
+        existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        existing.setExpenseId(100L);
         existing.setIdempotencyKey(key);
         existing.setCreatedBy(testUser);
         existing.setAmount(BigDecimal.valueOf(50));
-        existing.setType("INCOME");
-        existing.setCategory("Salary");
-        existing.setRecordDate(LocalDate.of(2026, 8, 18));
+        existing.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        existing.setExpenseDate(LocalDate.of(2026, 8, 18));
         
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setIdempotencyKey(key);
         req.setAmount(BigDecimal.valueOf(50));
-        req.setType("INCOME");
-        req.setCategory("Salary");
-        req.setRecordDate(LocalDate.of(2026, 8, 18));
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        RecordResponse result = recordService.createRecord(req, 1L);
+        ExpenseResponse result = recordService.createRecord(req, 1L);
 
-        assertEquals(100L, result.getRecordId());
+        assertEquals(100L, result.getExpenseId());
         verify(recordRepository, never()).saveAndFlush(any());
     }
 
     @Test
     void testIdempotentCreate_sameKeyDifferentPayload_throwsException() {
         String key = "ABC";
-        FinancialRecord existing = new FinancialRecord();
-        existing.setRecordId(100L);
+        Expense existing = new Expense();
+        existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        existing.setExpenseId(100L);
         existing.setIdempotencyKey(key);
         existing.setCreatedBy(testUser);
         existing.setAmount(BigDecimal.valueOf(50));
-        existing.setType("INCOME");
-        existing.setCategory("Salary");
-        existing.setRecordDate(LocalDate.of(2026, 8, 18));
+        existing.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        existing.setExpenseDate(LocalDate.of(2026, 8, 18));
         
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setIdempotencyKey(key);
         req.setAmount(BigDecimal.valueOf(100)); // Different amount
-        req.setType("INCOME");
-        req.setCategory("Salary");
-        req.setRecordDate(LocalDate.of(2026, 8, 18));
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
@@ -214,12 +212,11 @@ public class FinancialRecordServiceTest {
     @Test
     void testIdempotentCreate_crossUserCollision_succeedsIndependently() {
         String key = "ABC";
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setIdempotencyKey(key);
         req.setAmount(BigDecimal.valueOf(50));
-        req.setType("INCOME");
-        req.setCategory("Salary");
-        req.setRecordDate(LocalDate.of(2026, 8, 18));
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         User userB = new User();
         userB.setUserId(2L);
@@ -233,36 +230,37 @@ public class FinancialRecordServiceTest {
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(2L, key))
                 .thenReturn(Optional.empty());
 
-        FinancialRecord saved1 = new FinancialRecord();
-        saved1.setRecordId(101L);
+        Expense saved1 = new Expense();
+        saved1.setExpenseId(101L);
         saved1.setCreatedBy(testUser);
         saved1.setAmount(req.getAmount());
         
-        FinancialRecord saved2 = new FinancialRecord();
-        saved2.setRecordId(102L);
+        Expense saved2 = new Expense();
+        saved2.setExpenseId(102L);
         saved2.setCreatedBy(userB);
         saved2.setAmount(req.getAmount());
 
-        when(recordRepository.saveAndFlush(any(FinancialRecord.class))).thenAnswer(invocation -> {
-            FinancialRecord f = invocation.getArgument(0);
+        when(recordRepository.saveAndFlush(any(Expense.class))).thenAnswer(invocation -> {
+            Expense f = invocation.getArgument(0);
             if (f != null && f.getCreatedBy() != null && f.getCreatedBy().getUserId().equals(1L)) {
                 return saved1;
             }
             return saved2;
         });
 
-        RecordResponse result1 = recordService.createRecord(req, 1L);
-        RecordResponse result2 = recordService.createRecord(req, 2L);
+        ExpenseResponse result1 = recordService.createRecord(req, 1L);
+        ExpenseResponse result2 = recordService.createRecord(req, 2L);
 
-        assertEquals(101L, result1.getRecordId());
-        assertEquals(102L, result2.getRecordId());
-        verify(recordRepository, times(2)).saveAndFlush(any(FinancialRecord.class));
+        assertEquals(101L, result1.getExpenseId());
+        assertEquals(102L, result2.getExpenseId());
+        verify(recordRepository, times(2)).saveAndFlush(any(Expense.class));
     }
 
     @Test
     void testDeleteRecord_auditsAction() {
-        FinancialRecord record = new FinancialRecord();
-        record.setRecordId(5L);
+        Expense record = new Expense();
+        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        record.setExpenseId(5L);
         record.setCreatedBy(testUser);
 
         when(recordRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(record));

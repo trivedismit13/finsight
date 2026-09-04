@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Builder
-public class CategoryBudgetResponse {
+public class BudgetResponse {
     private Long budgetId;
     private String category;
     private String monthYear;

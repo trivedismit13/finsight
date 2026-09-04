@@ -8,21 +8,21 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "financial_records", 
+@Table(name = "expenses", 
     indexes = {
-        @Index(name = "idx_fr_dashboard", columnList = "is_deleted, record_date, category"),
-        @Index(name = "idx_fr_user_reports", columnList = "created_by, is_deleted, record_date"),
-        @Index(name = "idx_fr_budget_filter", columnList = "category, type, is_deleted, record_date")
+        @Index(name = "idx_expense_dashboard", columnList = "is_deleted, expense_date, category"),
+        @Index(name = "idx_expense_user_reports", columnList = "created_by, is_deleted, expense_date"),
+        @Index(name = "idx_expense_budget_filter", columnList = "category, status, is_deleted, expense_date")
     },
     uniqueConstraints = {
         @UniqueConstraint(name = "unique_user_idempotency", columnNames = {"created_by", "idempotency_key"})
     }
 )
-public class FinancialRecord {
+public class Expense {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "record_id")
-    private Long recordId;
+    @Column(name = "expense_id")
+    private Long expenseId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
@@ -31,14 +31,35 @@ public class FinancialRecord {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false, length = 50)
-    private String type; // INCOME, EXPENSE
+    @Column(nullable = false, length = 3)
+    private String currency = "INR";
 
-    @Column(nullable = false, length = 100)
-    private String category;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private ExpenseCategory category;
     
-    @Column(name = "record_date", nullable = false)
-    private LocalDate recordDate;
+    @Column(name = "expense_date", nullable = false)
+    private LocalDate expenseDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 50)
+    private ExpenseStatus status = ExpenseStatus.DRAFT;
+
+    @Column(name = "submitted_at")
+    private LocalDateTime submittedAt;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
+
+    @Column(name = "rejection_reason", columnDefinition = "TEXT")
+    private String rejectionReason;
 
     @Column(columnDefinition = "TEXT")
     private String description;

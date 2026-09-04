@@ -21,7 +21,7 @@ import java.util.Date;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(controllers = {FinancialRecordController.class, AuditController.class, ReportController.class})
+@WebMvcTest(controllers = {ExpenseController.class, AuditController.class, ReportController.class})
 @Import({com.finsight.security.SecurityConfig.class, com.finsight.security.JwtAuthFilter.class, com.finsight.security.JwtUtil.class, org.springframework.data.web.config.SpringDataJacksonConfiguration.class})
 @TestPropertySource(properties = {
     "jwt.secret=mySuperSecretKeyForTestingWhichNeedsToBeAtLeast32BytesLong!",
@@ -32,7 +32,7 @@ class AccessControlTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean private com.finsight.service.FinancialRecordService financialRecordService;
+    @MockBean private com.finsight.service.ExpenseService expenseService;
     @MockBean private com.finsight.repository.UserRepository userRepository;
     @MockBean private com.finsight.service.AuditLogService auditLogService;
     @Autowired private JwtUtil jwtUtil;
@@ -60,7 +60,7 @@ class AccessControlTest {
         String secretKey = "mySuperSecretKeyForTestingWhichNeedsToBeAtLeast32BytesLong!";
         String expiredToken = Jwts.builder()
                 .setSubject("test@test.com")
-                .claim("role", "VIEWER")
+                .claim("role", "EMPLOYEE")
                 .claim("userId", 1L)
                 .setIssuedAt(new Date(System.currentTimeMillis() - 100000))
                 .setExpiration(new Date(System.currentTimeMillis() - 1000)) // Expired
@@ -75,7 +75,7 @@ class AccessControlTest {
 
     @Test
     void testTamperedJwt_returns401() throws Exception {
-        String validToken = jwtUtil.generateAccessToken("test@test.com", "VIEWER", 1L);
+        String validToken = jwtUtil.generateAccessToken("test@test.com", "EMPLOYEE", 1L);
         String tamperedToken = validToken.substring(0, validToken.length() - 5) + "abcde";
 
         mockMvc.perform(get("/api/records")

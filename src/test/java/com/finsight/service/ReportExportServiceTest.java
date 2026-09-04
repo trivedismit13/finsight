@@ -1,10 +1,10 @@
 package com.finsight.service;
 
 import com.finsight.exception.InvalidRequestException;
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Expense;
 import com.finsight.model.ReportJob;
 import com.finsight.model.User;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.ReportJobRepository;
 import com.finsight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +32,7 @@ class ReportExportServiceTest {
     @Mock
     private UserRepository userRepository;
     @Mock
-    private FinancialRecordRepository financialRecordRepository;
+    private ExpenseRepository expenseRepository;
     @Mock
     private NotificationDispatcherService notificationDispatcherService;
     @Mock
@@ -102,7 +102,7 @@ class ReportExportServiceTest {
     void testSuccessfulCompletionEndToEnd() throws Exception {
         User user = new User();
         user.setUserId(1L);
-        user.setRole(com.finsight.model.Role.ADMIN);
+        user.setRole(com.finsight.model.Role.FINANCE_ADMIN);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
 
@@ -125,17 +125,16 @@ class ReportExportServiceTest {
         when(reportJobRepository.claimJob(999L)).thenReturn(1);
         when(reportJobRepository.updateJobState(eq(999L), eq("COMPLETED"), any(), any())).thenReturn(1);
 
-        FinancialRecord rec = new FinancialRecord();
-        rec.setRecordId(10L);
-        rec.setRecordDate(LocalDate.of(2026, 8, 5));
-        rec.setType("EXPENSE");
-        rec.setCategory("=CMD()");
+        Expense rec = new Expense();
+        rec.setExpenseId(10L);
+        rec.setExpenseDate(LocalDate.of(2026, 8, 5));
+        rec.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         rec.setAmount(new BigDecimal("100.00"));
         rec.setDescription("Normal \"quotes\" and , comma");
 
-        org.springframework.data.domain.Slice<FinancialRecord> slice = 
+        org.springframework.data.domain.Slice<Expense> slice = 
             new org.springframework.data.domain.SliceImpl<>(List.of(rec));
-        when(financialRecordRepository.findByDateRange(any(), any(), any())).thenReturn(slice);
+        when(expenseRepository.findByDateRange(any(), any(), any())).thenReturn(slice);
 
         // We can manually call handleReportJobCreated
         reportExportService.handleReportJobCreated(new com.finsight.service.ReportJobCreatedEvent(999L));

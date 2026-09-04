@@ -1,11 +1,11 @@
 package com.finsight.service;
 
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Expense;
 import com.finsight.model.Notification;
 import com.finsight.model.User;
 import com.finsight.repository.AuditLogRepository;
-import com.finsight.repository.CategoryBudgetRepository;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.BudgetRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.NotificationRepository;
 import com.finsight.repository.UserRepository;
 import com.finsight.queue.NotificationQueueManager;
@@ -34,12 +34,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @ActiveProfiles("test")
 public class FailureInjectionDbTest {
 
     @Autowired
-    private FinancialRecordService recordService;
+    private ExpenseService recordService;
     
     @Autowired
     private BudgetService budgetService;
@@ -48,10 +48,10 @@ public class FailureInjectionDbTest {
     private UserRepository userRepository;
 
     @Autowired
-    private FinancialRecordRepository recordRepository;
+    private ExpenseRepository recordRepository;
 
     @Autowired
-    private CategoryBudgetRepository budgetRepository;
+    private BudgetRepository budgetRepository;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -82,7 +82,7 @@ public class FailureInjectionDbTest {
         user.setName("Failure Test User");
         user.setEmail("failure@example.com");
         user.setPassword("password");
-        user.setRole(com.finsight.model.Role.VIEWER);
+        user.setRole(com.finsight.model.Role.EMPLOYEE);
         testUser = userRepository.save(user);
     }
 
@@ -93,11 +93,10 @@ public class FailureInjectionDbTest {
         Mockito.doThrow(new RuntimeException("Simulated DB failure during audit"))
                .when(auditLogService).record(any(Long.class), any(String.class), any(String.class), any(Long.class), any(String.class));
 
-        com.finsight.dto.request.CreateRecordRequest req = new com.finsight.dto.request.CreateRecordRequest();
+        com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
         req.setAmount(new BigDecimal("100.00"));
-        req.setType("INCOME");
-        req.setCategory("Salary");
-        req.setRecordDate(LocalDate.now());
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setExpenseDate(LocalDate.now());
         req.setIdempotencyKey("PARTIAL_FAIL_KEY");
 
         // The transaction should completely rollback
@@ -113,6 +112,7 @@ public class FailureInjectionDbTest {
 
     // 2. AFTER_COMMIT Queue Handoff Failure
     @Test
+    @org.springframework.security.test.context.support.WithMockUser(roles = "FINANCE_ADMIN")
     void testAfterCommitQueueFailure() {
         // Force the queue enqueue to fail by filling it up (we'll replace the queue temporarily)
         java.util.concurrent.BlockingQueue<Long> originalQueue = (java.util.concurrent.BlockingQueue<Long>) org.springframework.test.util.ReflectionTestUtils.getField(notificationQueueManager, "queue");
@@ -122,8 +122,8 @@ public class FailureInjectionDbTest {
         
         try {
             // Create a budget that triggers a notification
-            com.finsight.model.CategoryBudget budget = new com.finsight.model.CategoryBudget();
-            budget.setCategory("Food");
+            com.finsight.model.Budget budget = new com.finsight.model.Budget();
+            budget.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
             budget.setMonthYear("2026-08");
             budget.setBudgetAmount(new BigDecimal("50.00"));
             budget.setCreatedBy(testUser);
@@ -131,11 +131,10 @@ public class FailureInjectionDbTest {
             budgetService.createOrUpdateBudget(testUser.getUserId(), budget.getCategory(), budget.getMonthYear(), budget.getBudgetAmount());
 
             // Trigger notification
-            com.finsight.dto.request.CreateRecordRequest req = new com.finsight.dto.request.CreateRecordRequest();
+            com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
             req.setAmount(new BigDecimal("60.00"));
-            req.setType("EXPENSE");
-            req.setCategory("Food");
-            req.setRecordDate(LocalDate.of(2026, 8, 1));
+            req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+            req.setExpenseDate(LocalDate.of(2026, 8, 1));
             
             try {
                 recordService.createRecord(req, testUser.getUserId());
@@ -162,8 +161,8 @@ public class FailureInjectionDbTest {
         
         try {
             Notification n = new Notification();
+        n.setType("TEST_ALERT");
             n.setUserId(testUser);
-            n.setType("TEST");
             n.setChannel("EMAIL");
             n.setPayload("bounded_payload");
             n.setStatus("PENDING");

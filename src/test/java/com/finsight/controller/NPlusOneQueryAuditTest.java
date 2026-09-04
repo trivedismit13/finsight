@@ -6,7 +6,7 @@ import com.finsight.model.Notification;
 import com.finsight.model.Role;
 import com.finsight.model.User;
 import com.finsight.repository.AuditLogRepository;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.NotificationRepository;
 import com.finsight.repository.UserRepository;
 import jakarta.persistence.EntityManagerFactory;
@@ -48,7 +48,7 @@ class NPlusOneQueryAuditTest {
     private UserRepository userRepository;
 
     @Autowired
-    private FinancialRecordRepository recordRepository;
+    private ExpenseRepository recordRepository;
 
     @Autowired
     private AuditLogRepository auditLogRepository;
@@ -72,15 +72,14 @@ class NPlusOneQueryAuditTest {
             u.setName("User " + i);
             u.setEmail("user" + i + "@example.com");
             u.setPassword("hashedpassword" + i);
-            u.setRole(Role.VIEWER);
+            u.setRole(Role.EMPLOYEE);
             u = userRepository.save(u);
 
             for (int j = 1; j <= 10; j++) {
-                com.finsight.model.FinancialRecord r = new com.finsight.model.FinancialRecord();
+                com.finsight.model.Expense r = new com.finsight.model.Expense();
                 r.setAmount(new BigDecimal("10.00"));
-                r.setType("EXPENSE");
-                r.setCategory("Food");
-                r.setRecordDate(LocalDate.now());
+                r.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+                r.setExpenseDate(LocalDate.now());
                 r.setCreatedBy(u);
                 recordRepository.save(r);
             }
@@ -95,7 +94,6 @@ class NPlusOneQueryAuditTest {
             // Create Notification
             Notification n = new Notification();
             n.setUserId(u);
-            n.setType("REPORT");
             n.setPayload("sensitive payload");
             n.setStatus("DEAD_LETTER");
             n.setDeadLetterReason("Test");
@@ -113,8 +111,8 @@ class NPlusOneQueryAuditTest {
     }
 
     @Test
-    @com.finsight.security.WithMockCustomUser(roles = "ADMIN")
-    void testFinancialRecordsNPlusOneAndSerialization() throws Exception {
+    @com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
+    void testExpensesNPlusOneAndSerialization() throws Exception {
         hibernateStatistics.clear();
         
         mockMvc.perform(get("/api/records?page=0&size=20"))
@@ -131,7 +129,7 @@ class NPlusOneQueryAuditTest {
     }
     
     @Test
-    @com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+    @com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
     void testAuditLogsNPlusOneAndSerialization() throws Exception {
         hibernateStatistics.clear();
         
@@ -149,7 +147,7 @@ class NPlusOneQueryAuditTest {
     }
 
     @Test
-    @com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+    @com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
     void testNotificationDlqNPlusOneAndSerialization() throws Exception {
         hibernateStatistics.clear();
         

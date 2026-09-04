@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @ActiveProfiles("test")
 public class FailureInjectionNotificationTest {
 
@@ -52,7 +52,7 @@ public class FailureInjectionNotificationTest {
         user.setName("Notification Failure User");
         user.setEmail("notif_fail@example.com");
         user.setPassword("password");
-        user.setRole(com.finsight.model.Role.VIEWER);
+        user.setRole(com.finsight.model.Role.EMPLOYEE);
         testUser = userRepository.save(user);
     }
 
@@ -76,8 +76,8 @@ public class FailureInjectionNotificationTest {
                    .when(emailProviderService).sendEmail(any());
 
             Notification n = new Notification();
+        n.setType("TEST_ALERT");
             n.setUserId(testUser);
-            n.setType("TEST");
             n.setPayload("payload_1");
             n.setStatus("PENDING");
             n.setRetryCount(0);
@@ -108,8 +108,8 @@ public class FailureInjectionNotificationTest {
                .when(emailProviderService).sendEmail(any());
 
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload_isolated");
         n.setStatus("PENDING");
         n.setRetryCount(0);
@@ -132,8 +132,8 @@ public class FailureInjectionNotificationTest {
     @Test
     void testStaleProcessingRecovery() throws Exception {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload_stale");
         n.setStatus("PROCESSING");
         n.setLastAttemptAt(LocalDateTime.now().minusMinutes(10)); // 10 minutes ago, considered stale

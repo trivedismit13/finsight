@@ -1,8 +1,8 @@
 package com.finsight.controller;
 
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Expense;
 import com.finsight.model.User;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 public class PaginationFilterTest {
@@ -33,7 +33,7 @@ public class PaginationFilterTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private FinancialRecordRepository recordRepository;
+    private ExpenseRepository recordRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -49,31 +49,28 @@ public class PaginationFilterTest {
             u.setEmail("test@example.com");
             u.setPassword("password");
             u.setName("Test User");
-            u.setRole(com.finsight.model.Role.ANALYST);
+            u.setRole(com.finsight.model.Role.MANAGER);
             return userRepository.save(u);
         });
 
-        FinancialRecord r1 = new FinancialRecord();
+        Expense r1 = new Expense();
         r1.setAmount(new BigDecimal("100.00"));
-        r1.setType("EXPENSE");
-        r1.setCategory("Food");
-        r1.setRecordDate(LocalDate.of(2026, 8, 1));
+        r1.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        r1.setExpenseDate(LocalDate.of(2026, 8, 1));
         r1.setCreatedBy(testUser);
         recordRepository.save(r1);
 
-        FinancialRecord r2 = new FinancialRecord();
+        Expense r2 = new Expense();
         r2.setAmount(new BigDecimal("200.00"));
-        r2.setType("INCOME");
-        r2.setCategory("Salary");
-        r2.setRecordDate(LocalDate.of(2026, 8, 15));
+        r2.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        r2.setExpenseDate(LocalDate.of(2026, 8, 15));
         r2.setCreatedBy(testUser);
         recordRepository.save(r2);
 
-        FinancialRecord deleted = new FinancialRecord();
+        Expense deleted = new Expense();
         deleted.setAmount(new BigDecimal("50.00"));
-        deleted.setType("EXPENSE");
-        deleted.setCategory("Food");
-        deleted.setRecordDate(LocalDate.of(2026, 8, 20));
+        deleted.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        deleted.setExpenseDate(LocalDate.of(2026, 8, 20));
         deleted.setCreatedBy(testUser);
         deleted.setDeleted(true);
         recordRepository.save(deleted);

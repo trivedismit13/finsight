@@ -12,7 +12,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @org.springframework.test.context.ActiveProfiles("test")
 public class ConnectionPoolSaturationTest {
 

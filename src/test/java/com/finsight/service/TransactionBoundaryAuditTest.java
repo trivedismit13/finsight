@@ -1,10 +1,10 @@
 package com.finsight.service;
 
-import com.finsight.dto.request.CreateRecordRequest;
+import com.finsight.dto.request.CreateExpenseRequest;
 import com.finsight.model.Role;
 import com.finsight.model.User;
 import com.finsight.repository.AuditLogRepository;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.NotificationRepository;
 import com.finsight.repository.ReportJobRepository;
 import com.finsight.repository.UserRepository;
@@ -28,7 +28,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.event.ApplicationEvents;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @ActiveProfiles("test")
 @RecordApplicationEvents
 class TransactionBoundaryAuditTest {
@@ -37,7 +37,7 @@ class TransactionBoundaryAuditTest {
     private ApplicationEvents applicationEvents;
 
     @Autowired
-    private FinancialRecordService financialRecordService;
+    private ExpenseService expenseService;
 
     @Autowired
     private ReportExportService reportExportService;
@@ -49,7 +49,7 @@ class TransactionBoundaryAuditTest {
     private UserRepository userRepository;
 
     @Autowired
-    private FinancialRecordRepository recordRepository;
+    private ExpenseRepository recordRepository;
 
     @Autowired
     private ReportJobRepository reportJobRepository;
@@ -68,7 +68,7 @@ class TransactionBoundaryAuditTest {
         testUser.setName("Test Actor");
         testUser.setEmail("tx-" + UUID.randomUUID() + "@example.com");
         testUser.setPassword("pass");
-        testUser.setRole(Role.ADMIN);
+        testUser.setRole(Role.FINANCE_ADMIN);
         testUser = userRepository.save(testUser);
         
         // Reset spies just in case
@@ -77,17 +77,16 @@ class TransactionBoundaryAuditTest {
 
     @Test
     void testAuditSuccess() {
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("50.00"));
-        req.setCategory("TestCat");
-        req.setType("EXPENSE");
-        req.setRecordDate(LocalDate.now());
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setExpenseDate(LocalDate.now());
 
-        var response = financialRecordService.createRecord(req, testUser.getUserId());
+        var response = expenseService.createRecord(req, testUser.getUserId());
 
-        assertTrue(recordRepository.findById(response.getRecordId()).isPresent(), "Record must be saved");
+        assertTrue(recordRepository.findById(response.getExpenseId()).isPresent(), "Record must be saved");
         assertTrue(auditLogRepository.findAll().stream()
-                .anyMatch(a -> a.getEntityId().equals(response.getRecordId()) && "RECORD".equals(a.getEntityType())), 
+                .anyMatch(a -> a.getEntityId().equals(response.getExpenseId()) && "RECORD".equals(a.getEntityType())), 
                 "Audit log must be saved");
     }
 
@@ -96,14 +95,13 @@ class TransactionBoundaryAuditTest {
         // Force audit failure
         doThrow(new RuntimeException("Audit DB failure")).when(auditLogRepository).save(any());
 
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("99.00"));
-        req.setCategory("TestCat");
-        req.setType("EXPENSE");
-        req.setRecordDate(LocalDate.now());
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setExpenseDate(LocalDate.now());
 
         assertThrows(RuntimeException.class, () -> {
-            financialRecordService.createRecord(req, testUser.getUserId());
+            expenseService.createRecord(req, testUser.getUserId());
         });
 
         // Verify the record was rolled back

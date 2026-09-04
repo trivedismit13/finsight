@@ -1,13 +1,13 @@
 package com.finsight.service;
 
-import com.finsight.model.CategoryBudget;
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Budget;
+import com.finsight.model.Expense;
 import com.finsight.model.Notification;
 import com.finsight.model.ReportJob;
 import com.finsight.model.User;
 import com.finsight.repository.AuditLogRepository;
-import com.finsight.repository.CategoryBudgetRepository;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.BudgetRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.NotificationRepository;
 import com.finsight.repository.ReportJobRepository;
 import com.finsight.repository.UserRepository;
@@ -35,7 +35,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @ActiveProfiles("test")
 public class DatabaseConcurrencyTest {
 
@@ -43,7 +43,7 @@ public class DatabaseConcurrencyTest {
     private AuthService authService;
 
     @Autowired
-    private FinancialRecordService recordService;
+    private ExpenseService recordService;
     
     @Autowired
     private BudgetService budgetService;
@@ -58,10 +58,10 @@ public class DatabaseConcurrencyTest {
     private UserRepository userRepository;
     
     @Autowired
-    private FinancialRecordRepository recordRepository;
+    private ExpenseRepository recordRepository;
     
     @Autowired
-    private CategoryBudgetRepository budgetRepository;
+    private BudgetRepository budgetRepository;
     
     @Autowired
     private NotificationRepository notificationRepository;
@@ -91,7 +91,7 @@ public class DatabaseConcurrencyTest {
         user.setEmail("concurrency@example.com");
         // encode a password for auth test
         user.setPassword("$2a$10$rN2h2U2/k4p4O1j6QpD4cOO3xXl2vW1VpXpC6U7V8vV1XpXpXpXpX"); // fake hash
-        user.setRole(com.finsight.model.Role.VIEWER);
+        user.setRole(com.finsight.model.Role.EMPLOYEE);
         testUser = userRepository.save(user);
     }
 
@@ -132,17 +132,16 @@ public class DatabaseConcurrencyTest {
         executor.shutdown();
     }
 
-    // Test 2 — FinancialRecord optimistic locking
+    // Test 2 — Expense optimistic locking
     @Test
-    void testFinancialRecordOptimisticLocking() throws InterruptedException {
-        FinancialRecord record = new FinancialRecord();
+    void testExpenseOptimisticLocking() throws InterruptedException {
+        Expense record = new Expense();
         record.setCreatedBy(testUser);
         record.setAmount(new BigDecimal("100.00"));
-        record.setType("INCOME");
-        record.setCategory("Salary");
-        record.setRecordDate(LocalDate.now());
+        record.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        record.setExpenseDate(LocalDate.now());
         record.setDescription("Initial");
-        FinancialRecord savedRecord = recordRepository.save(record);
+        Expense savedRecord = recordRepository.save(record);
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -159,7 +158,7 @@ public class DatabaseConcurrencyTest {
                     latch.await();
                     transactionTemplate.executeWithoutResult(status -> {
                         // Read current state inside transaction
-                        FinancialRecord r = recordRepository.findById(savedRecord.getRecordId()).orElseThrow();
+                        Expense r = recordRepository.findById(savedRecord.getExpenseId()).orElseThrow();
                         // Sleep slightly to force overlap
                         try { Thread.sleep(100); } catch (Exception ignored) {}
                         r.setDescription("Updated by thread " + index);
@@ -192,8 +191,8 @@ public class DatabaseConcurrencyTest {
     // Test 3 — Budget alert race
     @Test
     void testBudgetAlertRace() throws InterruptedException {
-        CategoryBudget budget = new CategoryBudget();
-        budget.setCategory("Food");
+        Budget budget = new Budget();
+        budget.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
         budget.setMonthYear("2026-08");
         budget.setBudgetAmount(new BigDecimal("100.00"));
         budget.setCreatedBy(testUser);
@@ -201,12 +200,11 @@ public class DatabaseConcurrencyTest {
         budgetRepository.save(budget);
 
         // Pre-fill to 90
-        FinancialRecord r1 = new FinancialRecord();
+        Expense r1 = new Expense();
         r1.setCreatedBy(testUser);
         r1.setAmount(new BigDecimal("90.00"));
-        r1.setType("EXPENSE");
-        r1.setCategory("Food");
-        r1.setRecordDate(LocalDate.of(2026, 8, 10));
+        r1.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        r1.setExpenseDate(LocalDate.of(2026, 8, 10));
         recordRepository.save(r1);
 
         int threadCount = 2;
@@ -220,11 +218,10 @@ public class DatabaseConcurrencyTest {
                 try {
                     org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
                     latch.await();
-                    com.finsight.dto.request.CreateRecordRequest req = new com.finsight.dto.request.CreateRecordRequest();
+                    com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
                     req.setAmount(new BigDecimal("20.00"));
-                    req.setType("EXPENSE");
-                    req.setCategory("Food");
-                    req.setRecordDate(LocalDate.of(2026, 8, 11));
+                    req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+                    req.setExpenseDate(LocalDate.of(2026, 8, 11));
                     recordService.createRecord(req, testUser.getUserId());
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -237,7 +234,7 @@ public class DatabaseConcurrencyTest {
         latch.countDown();
         assertTrue(done.await(5, TimeUnit.SECONDS));
 
-        CategoryBudget updatedBudget = budgetRepository.findById(budget.getBudgetId()).orElseThrow();
+        Budget updatedBudget = budgetRepository.findById(budget.getBudgetId()).orElseThrow();
         assertTrue(updatedBudget.isAlertSent(), "Alert should be sent");
 
         List<Notification> notifications = notificationRepository.findAll();
@@ -249,8 +246,8 @@ public class DatabaseConcurrencyTest {
     // Test 4 — Budget notification failure (Atomicity)
     @Test
     void testBudgetNotificationFailureAtomicity() {
-        CategoryBudget budget = new CategoryBudget();
-        budget.setCategory("Travel");
+        Budget budget = new Budget();
+        budget.setCategory(com.finsight.model.ExpenseCategory.TRAVEL.name());
         budget.setMonthYear("2026-08");
         budget.setBudgetAmount(new BigDecimal("100.00"));
         budget.setCreatedBy(testUser);
@@ -271,7 +268,7 @@ public class DatabaseConcurrencyTest {
             // Expected
         }
         
-        CategoryBudget rollbackBudget = budgetRepository.findById(budget.getBudgetId()).orElseThrow();
+        Budget rollbackBudget = budgetRepository.findById(budget.getBudgetId()).orElseThrow();
         assertFalse(rollbackBudget.isAlertSent(), "The isAlertSent flag MUST rollback if the parent transaction (notification insert) fails");
     }
 
@@ -279,8 +276,8 @@ public class DatabaseConcurrencyTest {
     @Test
     void testNotificationDuplicateClaim() throws InterruptedException {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n = notificationRepository.save(n);
@@ -322,8 +319,8 @@ public class DatabaseConcurrencyTest {
     @Test
     void testNotificationRetryRace() throws InterruptedException {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PROCESSING");
         n.setRetryCount(1);
@@ -442,15 +439,14 @@ public class DatabaseConcurrencyTest {
                 try {
                     org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
                     latch.await();
-                    com.finsight.dto.request.CreateRecordRequest req = new com.finsight.dto.request.CreateRecordRequest();
+                    com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
                     req.setAmount(new BigDecimal("150.00"));
-                    req.setType("INCOME");
-                    req.setCategory("Bonus");
-                    req.setRecordDate(LocalDate.of(2026, 8, 18));
+                    req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+                    req.setExpenseDate(LocalDate.of(2026, 8, 18));
                     req.setIdempotencyKey(idempotencyKey);
                     
-                    com.finsight.dto.response.RecordResponse res = recordService.createRecord(req, testUser.getUserId());
-                    if (res != null && res.getRecordId() != null) {
+                    com.finsight.dto.response.ExpenseResponse res = recordService.createRecord(req, testUser.getUserId());
+                    if (res != null && res.getExpenseId() != null) {
                         successfulResponses.incrementAndGet();
                     }
                 } catch (Exception e) {
@@ -480,8 +476,8 @@ public class DatabaseConcurrencyTest {
         // and then run recoverNotifications to dump them into the queue.
         for (int i = 0; i < notificationCount; i++) {
             Notification n = new Notification();
+        n.setType("TEST_ALERT");
             n.setUserId(testUser);
-            n.setType("TEST");
             n.setPayload("payload_" + i);
             n.setStatus("PENDING");
             n.setRetryCount(0);

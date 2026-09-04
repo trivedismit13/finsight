@@ -7,10 +7,10 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "category_budgets", uniqueConstraints = {
+@Table(name = "budgets", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"category", "month_year"})
 })
-public class CategoryBudget {
+public class Budget {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "budget_id")

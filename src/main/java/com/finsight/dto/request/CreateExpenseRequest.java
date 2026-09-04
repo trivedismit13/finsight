@@ -8,7 +8,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Data
-public class CreateRecordRequest {
+public class CreateExpenseRequest {
     @NotNull
     @DecimalMin(value = "0.01")
     @jakarta.validation.constraints.DecimalMax(value = "9999999999999.99")
@@ -23,7 +23,7 @@ public class CreateRecordRequest {
     private String category;
 
     @NotNull
-    private LocalDate recordDate;
+    private LocalDate expenseDate;
 
     private String description;
 

@@ -1,7 +1,7 @@
 package com.finsight.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.finsight.dto.request.CreateRecordRequest;
+import com.finsight.dto.request.CreateExpenseRequest;
 import com.finsight.dto.request.LoginRequest;
 import com.finsight.dto.request.RegisterRequest;
 import org.junit.jupiter.api.Test;
@@ -31,13 +31,13 @@ public class ValidationIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @com.finsight.security.WithMockCustomUser(username = "admin@example.com", roles = "ADMIN")
+    @com.finsight.security.WithMockCustomUser(username = "finance_admin@example.com", roles = "FINANCE_ADMIN")
     public void testCreateRecordValidation() throws Exception {
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("-500.00")); // negative amount
-        req.setType("INVALID"); // invalid enum
+        // invalid enum
         req.setCategory(""); // blank category
-        req.setRecordDate(null); // missing date
+        req.setExpenseDate(null); // missing date
 
         mockMvc.perform(post("/api/records")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -46,9 +46,8 @@ public class ValidationIntegrationTest {
                 
         // Too many decimals
         req.setAmount(new BigDecimal("10.123"));
-        req.setType("EXPENSE");
-        req.setCategory("Food");
-        req.setRecordDate(LocalDate.now());
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setExpenseDate(LocalDate.now());
         
         mockMvc.perform(post("/api/records")
                 .contentType(MediaType.APPLICATION_JSON)

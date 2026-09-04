@@ -1,9 +1,9 @@
 package com.finsight.service;
 
-import com.finsight.model.FinancialRecord;
+import com.finsight.model.Expense;
 import com.finsight.model.ReportJob;
 import com.finsight.model.User;
-import com.finsight.repository.FinancialRecordRepository;
+import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.ReportJobRepository;
 import com.finsight.repository.UserRepository;
 import jakarta.annotation.PreDestroy;
@@ -34,7 +34,7 @@ import io.micrometer.core.instrument.Counter;
 public class ReportExportService {
     private final ReportJobRepository reportJobRepository;
     private final UserRepository userRepository;
-    private final FinancialRecordRepository financialRecordRepository;
+    private final ExpenseRepository expenseRepository;
     private final NotificationDispatcherService notificationDispatcherService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final MeterRegistry meterRegistry;
@@ -140,7 +140,7 @@ public class ReportExportService {
             // Eagerly fetch necessary data inside a minimal transaction/method, but here we can just use the repository to fetch what we need.
             // Since we need to know if the user is ADMIN, let's fetch the User directly.
             User requestedBy = userRepository.findById(job.getRequestedBy().getUserId()).orElseThrow();
-            boolean isAdmin = com.finsight.model.Role.ADMIN.equals(requestedBy.getRole());
+            boolean isAdmin = com.finsight.model.Role.FINANCE_ADMIN.equals(requestedBy.getRole());
             java.time.YearMonth ym = java.time.YearMonth.parse(job.getPeriod());
             java.time.LocalDate startDate = ym.atDay(1);
             java.time.LocalDate endDateExclusive = ym.plusMonths(1).atDay(1);
@@ -149,8 +149,8 @@ public class ReportExportService {
                 writer.write("Record ID,Date,Type,Category,Amount,Description\n");
 
                 org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
-                        0, 500, org.springframework.data.domain.Sort.by("recordDate", "recordId").ascending());
-                org.springframework.data.domain.Slice<FinancialRecord> slice;
+                        0, 500, org.springframework.data.domain.Sort.by("expenseDate", "expenseId").ascending());
+                org.springframework.data.domain.Slice<Expense> slice;
 
                 do {
                     slice = self.fetchAndWriteReportChunk(isAdmin, requestedBy.getUserId(), startDate, endDateExclusive, pageable, writer);
@@ -188,23 +188,23 @@ public class ReportExportService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    public org.springframework.data.domain.Slice<FinancialRecord> fetchAndWriteReportChunk(
+    public org.springframework.data.domain.Slice<Expense> fetchAndWriteReportChunk(
             boolean isAdmin, Long userId, java.time.LocalDate startDate, java.time.LocalDate endDateExclusive,
             org.springframework.data.domain.Pageable pageable, BufferedWriter writer) throws java.io.IOException {
             
-        org.springframework.data.domain.Slice<FinancialRecord> slice;
+        org.springframework.data.domain.Slice<Expense> slice;
         if (isAdmin) {
-            slice = financialRecordRepository.findByDateRange(startDate, endDateExclusive, pageable);
+            slice = expenseRepository.findByDateRange(startDate, endDateExclusive, pageable);
         } else {
-            slice = financialRecordRepository.findByUserAndDateRange(userId, startDate, endDateExclusive, pageable);
+            slice = expenseRepository.findByUserAndDateRange(userId, startDate, endDateExclusive, pageable);
         }
 
-        for (FinancialRecord record : slice.getContent()) {
+        for (Expense record : slice.getContent()) {
             writer.write(String.format("%s,%s,%s,%s,%s,%s\n",
-                    escapeCsv(String.valueOf(record.getRecordId())),
-                    escapeCsv(record.getRecordDate().toString()),
-                    escapeCsv(record.getType()),
-                    escapeCsvAndPreventInjection(record.getCategory()),
+                    escapeCsv(String.valueOf(record.getExpenseId())),
+                    escapeCsv(record.getExpenseDate().toString()),
+                    escapeCsv(record.getStatus().name()),
+                    escapeCsvAndPreventInjection(record.getCategory().name()),
                     escapeCsv(record.getAmount().toPlainString()),
                     escapeCsvAndPreventInjection(record.getDescription())
             ));

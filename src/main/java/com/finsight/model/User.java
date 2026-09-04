@@ -27,6 +27,11 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private User manager;
+
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 

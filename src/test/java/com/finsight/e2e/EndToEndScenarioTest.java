@@ -1,10 +1,10 @@
 package com.finsight.e2e;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.finsight.dto.request.CreateRecordRequest;
+import com.finsight.dto.request.CreateExpenseRequest;
 import com.finsight.dto.request.LoginRequest;
 import com.finsight.dto.request.RegisterRequest;
-import com.finsight.dto.response.RecordResponse;
+import com.finsight.dto.response.ExpenseResponse;
 import com.finsight.dto.response.UserResponse;
 import com.finsight.model.Notification;
 import com.finsight.repository.AuditLogRepository;
@@ -80,29 +80,28 @@ public class EndToEndScenarioTest {
     @Test
     void executeScenario() throws Exception {
         // --- Step 1: Register ---
-        registerUser("Viewer", "viewer@example.com", "password123", "VIEWER");
-        registerUser("Analyst", "analyst@example.com", "password123", "ANALYST");
-        registerUser("Admin", "admin@example.com", "password123", "ADMIN");
+        registerUser("Viewer", "employee@example.com", "password123", "EMPLOYEE");
+        registerUser("Analyst", "manager@example.com", "password123", "MANAGER");
+        registerUser("Admin", "finance_admin@example.com", "password123", "FINANCE_ADMIN");
 
         // Verify roles cannot be self-escalated
         // RegistrationRequest allows setting role in this app? Wait, let's check API.
         // If the API allows role input but we assume it assigns correctly, we verify the response.
 
         // --- Step 2: Login each user ---
-        viewerToken = loginUser("viewer@example.com", "password123");
-        analystToken = loginUser("analyst@example.com", "password123");
-        adminToken = loginUser("admin@example.com", "password123");
+        viewerToken = loginUser("employee@example.com", "password123");
+        analystToken = loginUser("manager@example.com", "password123");
+        adminToken = loginUser("finance_admin@example.com", "password123");
 
         assertNotNull(viewerToken);
         assertNotNull(analystToken);
         assertNotNull(adminToken);
 
         // --- Step 3: Viewer attempts to create a financial record ---
-        CreateRecordRequest createReq = new CreateRecordRequest();
+        CreateExpenseRequest createReq = new CreateExpenseRequest();
         createReq.setAmount(new BigDecimal("100.00"));
-        createReq.setType("EXPENSE");
-        createReq.setCategory("Food");
-        createReq.setRecordDate(LocalDate.now());
+        createReq.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        createReq.setExpenseDate(LocalDate.now());
 
         mockMvc.perform(post("/api/records")
                 .header("Authorization", "Bearer " + viewerToken)
@@ -112,8 +111,7 @@ public class EndToEndScenarioTest {
 
         // --- Step 4: Admin creates records with idempotency key ---
         createReq.setAmount(new BigDecimal("100000.00"));
-        createReq.setType("INCOME");
-        createReq.setCategory("Salary");
+        createReq.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
         createReq.setIdempotencyKey("idem-key-1");
         
         MvcResult res1 = mockMvc.perform(post("/api/records")
@@ -125,11 +123,10 @@ public class EndToEndScenarioTest {
         
         java.util.Map<?, ?> apiRes1 = objectMapper.readValue(res1.getResponse().getContentAsString(), java.util.Map.class);
         java.util.Map<?, ?> record1 = (java.util.Map<?, ?>) apiRes1.get("data");
-        assertNotNull(record1.get("recordId"));
+        assertNotNull(record1.get("expenseId"));
 
         createReq.setAmount(new BigDecimal("5000.00"));
-        createReq.setType("EXPENSE");
-        createReq.setCategory("Food");
+        createReq.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
         createReq.setIdempotencyKey("idem-key-2");
 
         MvcResult res2 = mockMvc.perform(post("/api/records")
@@ -156,7 +153,7 @@ public class EndToEndScenarioTest {
         // Verify no duplicate record (ID should match)
         java.util.Map<?, ?> apiRes2 = objectMapper.readValue(res2.getResponse().getContentAsString(), java.util.Map.class);
         java.util.Map<?, ?> record2 = (java.util.Map<?, ?>) apiRes2.get("data");
-        assertEquals(record2.get("recordId"), record2Repeat.get("recordId"));
+        assertEquals(record2.get("expenseId"), record2Repeat.get("expenseId"));
 
         // --- Step 6: Repeat using same key but different payload ---
         createReq.setAmount(new BigDecimal("6000.00")); // Different amount
@@ -177,11 +174,10 @@ public class EndToEndScenarioTest {
                 .andExpect(status().isOk());
 
         // Cross the threshold
-        CreateRecordRequest crossBudgetReq = new CreateRecordRequest();
+        CreateExpenseRequest crossBudgetReq = new CreateExpenseRequest();
         crossBudgetReq.setAmount(new BigDecimal("150.00"));
-        crossBudgetReq.setType("EXPENSE");
-        crossBudgetReq.setCategory("Entertainment");
-        crossBudgetReq.setRecordDate(LocalDate.of(2026, 8, 15));
+        crossBudgetReq.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        crossBudgetReq.setExpenseDate(LocalDate.of(2026, 8, 15));
         crossBudgetReq.setIdempotencyKey("budget-key-1");
         
         mockMvc.perform(post("/api/records")
@@ -254,7 +250,7 @@ public class EndToEndScenarioTest {
                 .andExpect(status().isForbidden()); // 403 because Viewer doesn't have role
         
         // Let's create Analyst 2 to prove IDOR prevention
-        registerUser("Analyst2", "analyst2@example.com", "password123", "ANALYST");
+        registerUser("Analyst2", "analyst2@example.com", "password123", "MANAGER");
         String analyst2Token = loginUser("analyst2@example.com", "password123");
         
         mockMvc.perform(get("/api/reports/export/" + jobId + "/download")
@@ -274,11 +270,10 @@ public class EndToEndScenarioTest {
             executor.submit(() -> {
                 try {
                     latch.await();
-                    CreateRecordRequest concReq = new CreateRecordRequest();
+                    CreateExpenseRequest concReq = new CreateExpenseRequest();
                     concReq.setAmount(new BigDecimal("500.00"));
-                    concReq.setType("EXPENSE");
-                    concReq.setCategory("Travel");
-                    concReq.setRecordDate(LocalDate.now());
+                    concReq.setCategory(com.finsight.model.ExpenseCategory.TRAVEL.name());
+                    concReq.setExpenseDate(LocalDate.now());
                     concReq.setIdempotencyKey("concurrent-idem-key");
                     
                     MvcResult res = mockMvc.perform(post("/api/records")

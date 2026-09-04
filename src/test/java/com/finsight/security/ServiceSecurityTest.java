@@ -1,10 +1,10 @@
 package com.finsight.security;
 
-import com.finsight.dto.request.CreateRecordRequest;
+import com.finsight.dto.request.CreateExpenseRequest;
 import com.finsight.model.User;
 import com.finsight.model.Role;
 import com.finsight.repository.UserRepository;
-import com.finsight.service.FinancialRecordService;
+import com.finsight.service.ExpenseService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class ServiceSecurityTest {
 
     @Autowired
-    private FinancialRecordService recordService;
+    private ExpenseService recordService;
 
     @Autowired
     private UserRepository userRepository;
@@ -39,21 +39,21 @@ class ServiceSecurityTest {
 
         viewerUser = new User();
         viewerUser.setName("Viewer");
-        viewerUser.setEmail("viewer@example.com");
+        viewerUser.setEmail("employee@example.com");
         viewerUser.setPassword("hashed");
-        viewerUser.setRole(Role.VIEWER);
+        viewerUser.setRole(Role.EMPLOYEE);
         userRepository.save(viewerUser);
 
         adminUser = new User();
         adminUser.setName("Admin");
-        adminUser.setEmail("admin@example.com");
+        adminUser.setEmail("finance_admin@example.com");
         adminUser.setPassword("hashed");
-        adminUser.setRole(Role.ADMIN);
+        adminUser.setRole(Role.FINANCE_ADMIN);
         userRepository.save(adminUser);
     }
 
     @Test
-    @WithMockCustomUser(roles = "VIEWER")
+    @WithMockCustomUser(roles = "EMPLOYEE")
     void testViewerCannotDeleteRecord_throwsAccessDeniedException() {
         assertThrows(AccessDeniedException.class, () -> {
             recordService.deleteRecord(1L, viewerUser.getUserId());
@@ -61,13 +61,12 @@ class ServiceSecurityTest {
     }
 
     @Test
-    @WithMockCustomUser(roles = "VIEWER")
+    @WithMockCustomUser(roles = "EMPLOYEE")
     void testViewerCannotCreateRecord_throwsAccessDeniedException() {
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("100"));
-        req.setType("EXPENSE");
-        req.setCategory("Food");
-        req.setRecordDate(LocalDate.now());
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setExpenseDate(LocalDate.now());
 
         assertThrows(AccessDeniedException.class, () -> {
             recordService.createRecord(req, viewerUser.getUserId());
@@ -75,7 +74,7 @@ class ServiceSecurityTest {
     }
 
     @Test
-    @WithMockCustomUser(roles = "ADMIN")
+    @WithMockCustomUser(roles = "FINANCE_ADMIN")
     void testAdminCanDeleteRecord_AccessDeniedNotThrown() {
         // We might get ResourceNotFoundException because record 1L doesn't exist, but we should NOT get AccessDeniedException
         assertThrows(com.finsight.exception.ResourceNotFoundException.class, () -> {
@@ -85,11 +84,10 @@ class ServiceSecurityTest {
 
     @Test
     void testNoUserThrowsAuthenticationCredentialsNotFoundException() {
-        CreateRecordRequest req = new CreateRecordRequest();
+        CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("100"));
-        req.setType("EXPENSE");
-        req.setCategory("Food");
-        req.setRecordDate(LocalDate.now());
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setExpenseDate(LocalDate.now());
 
         assertThrows(org.springframework.security.authentication.AuthenticationCredentialsNotFoundException.class, () -> {
             recordService.createRecord(req, 1L);

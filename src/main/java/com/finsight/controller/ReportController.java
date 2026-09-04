@@ -24,7 +24,7 @@ public class ReportController {
         throw new RuntimeException("Authenticated user not found or invalid type");
     }
 
-    @PostMapping("/export")
+    @PostMapping("/expense-summary")
     public ResponseEntity<ApiResponse<Long>> requestExport(
             @RequestParam String period,
             @AuthenticationPrincipal UserDetails principal) {
@@ -36,7 +36,7 @@ public class ReportController {
         return ResponseEntity.accepted().body(new ApiResponse<>("Report job queued", jobId));
     }
 
-    @GetMapping("/export/{jobId}")
+    @GetMapping("/expense-summary/{jobId}")
     public ResponseEntity<ApiResponse<ReportJob>> getStatus(@PathVariable Long jobId,
             @AuthenticationPrincipal UserDetails principal) {
         Long userId = resolveUserId(principal);
@@ -46,7 +46,7 @@ public class ReportController {
         return ResponseEntity.ok(new ApiResponse<>("Job status", job));
     }
 
-    @GetMapping("/export/{jobId}/download")
+    @GetMapping("/expense-summary/{jobId}/download")
     public ResponseEntity<org.springframework.core.io.Resource> downloadReport(@PathVariable Long jobId,
             @AuthenticationPrincipal UserDetails principal) {
         Long userId = resolveUserId(principal);

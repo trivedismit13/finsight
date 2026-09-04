@@ -18,7 +18,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
-@com.finsight.security.WithMockCustomUser(roles = "ADMIN")
+@com.finsight.security.WithMockCustomUser(roles = "FINANCE_ADMIN")
 @ActiveProfiles("test")
 public class NotificationIntegrationTest {
 
@@ -48,15 +48,15 @@ public class NotificationIntegrationTest {
         testUser.setName("Notif User");
         testUser.setEmail("notif@test.com");
         testUser.setPassword("password");
-        testUser.setRole(com.finsight.model.Role.VIEWER);
+        testUser.setRole(com.finsight.model.Role.EMPLOYEE);
         testUser = userRepository.save(testUser);
     }
 
     @Test
     void test1_Persistence_PendingState() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n.setRetryCount(0);
@@ -72,8 +72,8 @@ public class NotificationIntegrationTest {
     void test2_SuccessfulDelivery() throws InterruptedException {
         // Enqueue and process
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n.setRetryCount(0);
@@ -93,8 +93,8 @@ public class NotificationIntegrationTest {
     @Test
     void test3_FailedDelivery_Backoff() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n.setRetryCount(0);
@@ -113,8 +113,8 @@ public class NotificationIntegrationTest {
     @Test
     void test5_DeadLetter() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n.setRetryCount(3); // exhausted retries
@@ -132,8 +132,8 @@ public class NotificationIntegrationTest {
     @Test
     void test6_SentCannotBeProcessedAgain() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("SENT");
         n.setRetryCount(0);
@@ -147,8 +147,8 @@ public class NotificationIntegrationTest {
     @Test
     void test7_ConcurrentDuplicateProcessing() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n.setRetryCount(0);
@@ -171,8 +171,8 @@ public class NotificationIntegrationTest {
         Long[] ids = new Long[5];
         for (int i = 0; i < 5; i++) {
             Notification n = new Notification();
+        n.setType("TEST_ALERT");
             n.setUserId(testUser);
-            n.setType("TEST");
             n.setPayload("payload " + i);
             n.setStatus("PENDING");
             n.setRetryCount(0);
@@ -208,29 +208,34 @@ public class NotificationIntegrationTest {
 
         // PENDING
         Notification n1 = new Notification();
-        n1.setUserId(testUser); n1.setType("TEST"); n1.setPayload("p1"); n1.setStatus("PENDING"); n1.setRetryCount(0); n1.setMaxRetries(3);
+        n1.setType("TEST_ALERT");
+        n1.setUserId(testUser); n1.setPayload("p1"); n1.setStatus("PENDING"); n1.setRetryCount(0); n1.setMaxRetries(3);
         n1 = notificationRepository.save(n1);
 
         // FAILED + nextAttemptAt past
         Notification n2 = new Notification();
-        n2.setUserId(testUser); n2.setType("TEST"); n2.setPayload("p2"); n2.setStatus("FAILED"); n2.setRetryCount(1); n2.setMaxRetries(3);
+        n2.setType("TEST_ALERT");
+        n2.setUserId(testUser); n2.setPayload("p2"); n2.setStatus("FAILED"); n2.setRetryCount(1); n2.setMaxRetries(3);
         n2.setNextAttemptAt(LocalDateTime.now().minusMinutes(5));
         n2 = notificationRepository.save(n2);
 
         // FAILED + future nextAttemptAt (should NOT recover)
         Notification n3 = new Notification();
-        n3.setUserId(testUser); n3.setType("TEST"); n3.setPayload("p3"); n3.setStatus("FAILED"); n3.setRetryCount(1); n3.setMaxRetries(3);
+        n3.setType("TEST_ALERT");
+        n3.setUserId(testUser); n3.setPayload("p3"); n3.setStatus("FAILED"); n3.setRetryCount(1); n3.setMaxRetries(3);
         n3.setNextAttemptAt(LocalDateTime.now().plusMinutes(5));
         n3 = notificationRepository.save(n3);
 
         // SENT (should NOT recover)
         Notification n4 = new Notification();
-        n4.setUserId(testUser); n4.setType("TEST"); n4.setPayload("p4"); n4.setStatus("SENT"); n4.setRetryCount(0); n4.setMaxRetries(3);
+        n4.setType("TEST_ALERT");
+        n4.setUserId(testUser); n4.setPayload("p4"); n4.setStatus("SENT"); n4.setRetryCount(0); n4.setMaxRetries(3);
         n4 = notificationRepository.save(n4);
 
         // DEAD_LETTER (should NOT recover)
         Notification n5 = new Notification();
-        n5.setUserId(testUser); n5.setType("TEST"); n5.setPayload("p5"); n5.setStatus("DEAD_LETTER"); n5.setRetryCount(3); n5.setMaxRetries(3);
+        n5.setType("TEST_ALERT");
+        n5.setUserId(testUser); n5.setPayload("p5"); n5.setStatus("DEAD_LETTER"); n5.setRetryCount(3); n5.setMaxRetries(3);
         n5 = notificationRepository.save(n5);
 
         queueManager.pollReadyNotifications();
@@ -253,8 +258,8 @@ public class NotificationIntegrationTest {
     @Test
     void testDuplicateRecoveryPrevention() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PENDING");
         n.setRetryCount(0);
@@ -285,8 +290,8 @@ public class NotificationIntegrationTest {
     @Test
     void testCrashRecovery() {
         Notification n = new Notification();
+        n.setType("TEST_ALERT");
         n.setUserId(testUser);
-        n.setType("TEST");
         n.setPayload("payload");
         n.setStatus("PROCESSING");
         n.setRetryCount(0);

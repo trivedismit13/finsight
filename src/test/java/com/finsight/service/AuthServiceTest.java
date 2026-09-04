@@ -49,7 +49,7 @@ class AuthServiceTest {
         testUser.setUserId(1L);
         testUser.setEmail("test@test.com");
         testUser.setPassword("encodedPassword");
-        testUser.setRole(Role.VIEWER);
+        testUser.setRole(Role.EMPLOYEE);
         testUser.setActive(true);
         
         lenient().when(securityLockoutConfig.getMaxAttempts()).thenReturn(5);
@@ -251,7 +251,7 @@ class AuthServiceTest {
 
         assertEquals("Test User", response.getName());
         assertEquals("newuser@test.com", response.getEmail());
-        assertEquals(Role.VIEWER.name(), response.getRole());
+        assertEquals(Role.EMPLOYEE.name(), response.getRole());
 
         verify(userRepository).save(any(User.class));
     }

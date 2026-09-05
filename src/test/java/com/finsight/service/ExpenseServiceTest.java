@@ -266,6 +266,6 @@ public class ExpenseServiceTest {
 
         assertTrue(record.isDeleted());
         verify(recordRepository).save(record);
-        verify(auditLogService).record(1L, "DELETE_RECORD", "RECORD", 5L, "Soft deleted record: 5");
+        verify(auditLogService).record(eq(1L), eq("DELETE_RECORD"), eq("RECORD"), eq(5L), eq("Deleted record: 5"));
     }
 }

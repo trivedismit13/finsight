@@ -29,6 +29,9 @@ public class ReportJob {
 
     @Column(name = "correlation_id", length = 36)
     private String correlationId;
+    
+    @Column(name = "failure_reason", columnDefinition = "TEXT")
+    private String failureReason;
 
 
     @Column(name = "created_at")

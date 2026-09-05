@@ -75,7 +75,7 @@ public class AuditIntegrationTest {
             .when(budgetService).checkBudgetExceededAfterRecord(anyString(), anyString(), anyLong());
         
         try {
-            expenseService.createRecord(req, testUser.getUserId());
+            expenseService.createExpense(req, testUser.getUserId());
         } catch (Exception e) {
             // expected
         }
@@ -98,7 +98,7 @@ public class AuditIntegrationTest {
                 .record(any(), anyString(), anyString(), any(), anyString());
 
         try {
-            expenseService.createRecord(req, testUser.getUserId());
+            expenseService.createExpense(req, testUser.getUserId());
         } catch (Exception e) {
             // expected RuntimeException
         }
@@ -122,7 +122,7 @@ public class AuditIntegrationTest {
                 .record(any(), eq("DELETE_RECORD"), anyString(), any(), anyString());
 
         try {
-            expenseService.deleteRecord(expenseId, testUser.getUserId());
+            expenseService.deleteExpense(expenseId, testUser.getUserId());
         } catch (Exception e) {
             // expected RuntimeException
         }

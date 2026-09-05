@@ -39,7 +39,7 @@ public class ValidationIntegrationTest {
         req.setCategory(""); // blank category
         req.setExpenseDate(null); // missing date
 
-        mockMvc.perform(post("/api/records")
+        mockMvc.perform(post("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
@@ -49,7 +49,7 @@ public class ValidationIntegrationTest {
         req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
         req.setExpenseDate(LocalDate.now());
         
-        mockMvc.perform(post("/api/records")
+        mockMvc.perform(post("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
@@ -57,7 +57,7 @@ public class ValidationIntegrationTest {
         // Too large amount
         req.setAmount(new BigDecimal("999999999999999999.99"));
         
-        mockMvc.perform(post("/api/records")
+        mockMvc.perform(post("/api/expenses")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());

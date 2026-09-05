@@ -103,14 +103,14 @@ public class ReportFailureInjectionTest {
 
         com.finsight.security.CustomUserDetails principal = new com.finsight.security.CustomUserDetails(
                 testUser.getEmail(), "password", true, true, true, true,
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ANALYST")),
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_FINANCE_ADMIN")),
                 testUser.getUserId()
         );
         org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth = 
                 new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal, "password", principal.getAuthorities());
 
         // Request download, expecting 400 because the status is not COMPLETED
-        mockMvc.perform(get("/api/reports/export/" + jobId + "/download")
+        mockMvc.perform(get("/api/reports/expense-summary/" + jobId + "/download")
                 .with(authentication(auth)))
                 .andExpect(status().isBadRequest());
     }
@@ -130,14 +130,14 @@ public class ReportFailureInjectionTest {
 
         com.finsight.security.CustomUserDetails principal = new com.finsight.security.CustomUserDetails(
                 testUser.getEmail(), "password", true, true, true, true,
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ANALYST")),
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_FINANCE_ADMIN")),
                 testUser.getUserId()
         );
         org.springframework.security.authentication.UsernamePasswordAuthenticationToken auth = 
                 new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(principal, "password", principal.getAuthorities());
 
         // Request download, expecting 404 because file is missing
-        mockMvc.perform(get("/api/reports/export/" + job.getJobId() + "/download")
+        mockMvc.perform(get("/api/reports/expense-summary/" + job.getJobId() + "/download")
                 .with(authentication(auth)))
                 .andExpect(status().isNotFound());
                 

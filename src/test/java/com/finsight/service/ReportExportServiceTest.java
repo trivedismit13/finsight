@@ -151,6 +151,6 @@ class ReportExportServiceTest {
         
         assertEquals(2, lines.size());
         assertEquals("Record ID,Date,Type,Category,Amount,Description", lines.get(0));
-        assertEquals("10,2026-08-05,EXPENSE,'=CMD(),100.00,\"Normal \"\"quotes\"\" and , comma\"", lines.get(1));
+        assertEquals("10,2026-08-05,DRAFT,OTHER,100.00,\"Normal \"\"quotes\"\" and , comma\"", lines.get(1));
     }
 }

@@ -27,9 +27,9 @@ public class ExpenseController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<ExpenseResponse>>> getAllRecords(
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<ExpenseResponse>>> getAllExpenses(
             @RequestParam(value = "page", required = false) Integer pageNumber,
-            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String status,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate startDate,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate endDate,
@@ -40,14 +40,18 @@ public class ExpenseController {
             throw new com.finsight.exception.InvalidRequestException("Page number cannot be less than zero.");
         }
 
-        if (type != null && !type.matches("^(INCOME|EXPENSE)$")) {
-            throw new com.finsight.exception.InvalidRequestException("Type must be INCOME or EXPENSE");
+        if (status != null) {
+            try {
+                com.finsight.model.ExpenseStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
+                throw new com.finsight.exception.InvalidRequestException("Status is invalid");
+            }
         }
 
         Long actorId = resolveUserId(principal);
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_FINANCE_ADMIN"));
 
-        return ResponseEntity.ok(new ApiResponse<>("Records fetched", service.getAllRecords(type, category, startDate, endDate, pageable, actorId, isAdmin)));
+        return ResponseEntity.ok(new ApiResponse<>("Records fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId, isAdmin)));
     }
 
     @PostMapping
@@ -55,7 +59,7 @@ public class ExpenseController {
             @Valid @RequestBody CreateExpenseRequest req,
             @AuthenticationPrincipal UserDetails principal) {
         Long actorId = resolveUserId(principal);
-        ExpenseResponse rec = service.createRecord(req, actorId);
+        ExpenseResponse rec = service.createExpense(req, actorId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>("Record created", rec));
     }
@@ -66,7 +70,7 @@ public class ExpenseController {
             @Valid @RequestBody UpdateExpenseRequest req,
             @AuthenticationPrincipal UserDetails principal) {
         Long actorId = resolveUserId(principal);
-        ExpenseResponse rec = service.updateRecord(id, req, actorId);
+        ExpenseResponse rec = service.updateExpense(id, req, actorId);
         return ResponseEntity.ok(new ApiResponse<>("Record updated", rec));
     }
 
@@ -75,7 +79,7 @@ public class ExpenseController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {
         Long actorId = resolveUserId(principal);
-        service.deleteRecord(id, actorId);
+        service.deleteExpense(id, actorId);
         return ResponseEntity.noContent().build();
     }
 
@@ -132,7 +136,7 @@ public class ExpenseController {
         Long actorId = resolveUserId(principal);
         // Ensure they have FINANCE_ADMIN or ADMIN role. Handled by Service's PreAuthorize implicitly if passed through
         // but we'll let service handle security. The boolean flag forces admin mode fetch.
-        return ResponseEntity.ok(new ApiResponse<>("All expenses fetched", service.getAllRecords(status, category, startDate, endDate, pageable, actorId, true)));
+        return ResponseEntity.ok(new ApiResponse<>("All expenses fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId, true)));
     }
 
     @PostMapping("/admin/{id}/process")

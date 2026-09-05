@@ -222,7 +222,7 @@ public class DatabaseConcurrencyTest {
                     req.setAmount(new BigDecimal("20.00"));
                     req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
                     req.setExpenseDate(LocalDate.of(2026, 8, 11));
-                    recordService.createRecord(req, testUser.getUserId());
+                    recordService.createExpense(req, testUser.getUserId());
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {
@@ -445,7 +445,7 @@ public class DatabaseConcurrencyTest {
                     req.setExpenseDate(LocalDate.of(2026, 8, 18));
                     req.setIdempotencyKey(idempotencyKey);
                     
-                    com.finsight.dto.response.ExpenseResponse res = recordService.createRecord(req, testUser.getUserId());
+                    com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, testUser.getUserId());
                     if (res != null && res.getExpenseId() != null) {
                         successfulResponses.incrementAndGet();
                     }

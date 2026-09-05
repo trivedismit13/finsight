@@ -68,7 +68,7 @@ public class ExpenseServiceTest {
 
         // Should throw because 1 (DB) != 0 (client)
         assertThrows(OptimisticLockingFailureException.class,
-                () -> recordService.updateRecord(10L, req, 1L));
+                () -> recordService.updateExpense(10L, req, 1L));
 
         // The record should NOT have been saved
         verify(recordRepository, never()).save(any());
@@ -104,7 +104,7 @@ public class ExpenseServiceTest {
                 .thenReturn(Optional.of(existing)); // after DataIntegrityViolationException
         when(recordRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        ExpenseResponse result = recordService.createRecord(req, 1L);
+        ExpenseResponse result = recordService.createExpense(req, 1L);
 
         assertEquals(99L, result.getExpenseId());
         // Only one save attempt was made
@@ -135,7 +135,7 @@ public class ExpenseServiceTest {
         req.setCategory(com.finsight.model.ExpenseCategory.TRANSPORT.name());
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
-        ExpenseResponse result = recordService.updateRecord(5L, req, 1L);
+        ExpenseResponse result = recordService.updateExpense(5L, req, 1L);
 
         assertNotNull(result);
         verify(auditLogService).record(eq(1L), eq("UPDATE_RECORD"), eq("RECORD"), eq(5L), anyString());
@@ -154,7 +154,7 @@ public class ExpenseServiceTest {
         req.setVersion(0L);
 
         assertThrows(ResourceNotFoundException.class,
-                () -> recordService.updateRecord(999L, req, 1L));
+                () -> recordService.updateExpense(999L, req, 1L));
     }
 
     @Test
@@ -178,7 +178,7 @@ public class ExpenseServiceTest {
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        ExpenseResponse result = recordService.createRecord(req, 1L);
+        ExpenseResponse result = recordService.createExpense(req, 1L);
 
         assertEquals(100L, result.getExpenseId());
         verify(recordRepository, never()).saveAndFlush(any());
@@ -205,7 +205,7 @@ public class ExpenseServiceTest {
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        assertThrows(IllegalArgumentException.class, () -> recordService.createRecord(req, 1L));
+        assertThrows(IllegalArgumentException.class, () -> recordService.createExpense(req, 1L));
         verify(recordRepository, never()).saveAndFlush(any());
     }
 
@@ -234,11 +234,15 @@ public class ExpenseServiceTest {
         saved1.setExpenseId(101L);
         saved1.setCreatedBy(testUser);
         saved1.setAmount(req.getAmount());
+        saved1.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        saved1.setExpenseDate(LocalDate.now());
         
         Expense saved2 = new Expense();
         saved2.setExpenseId(102L);
         saved2.setCreatedBy(userB);
         saved2.setAmount(req.getAmount());
+        saved2.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        saved2.setExpenseDate(LocalDate.now());
 
         when(recordRepository.saveAndFlush(any(Expense.class))).thenAnswer(invocation -> {
             Expense f = invocation.getArgument(0);
@@ -248,8 +252,8 @@ public class ExpenseServiceTest {
             return saved2;
         });
 
-        ExpenseResponse result1 = recordService.createRecord(req, 1L);
-        ExpenseResponse result2 = recordService.createRecord(req, 2L);
+        ExpenseResponse result1 = recordService.createExpense(req, 1L);
+        ExpenseResponse result2 = recordService.createExpense(req, 2L);
 
         assertEquals(101L, result1.getExpenseId());
         assertEquals(102L, result2.getExpenseId());
@@ -265,10 +269,10 @@ public class ExpenseServiceTest {
 
         when(recordRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(record));
 
-        recordService.deleteRecord(5L, 1L);
+        recordService.deleteExpense(5L, 1L);
 
         assertTrue(record.isDeleted());
         verify(recordRepository).save(record);
-        verify(auditLogService).record(1L, "DELETE_RECORD", "RECORD", 5L, "Soft deleted record");
+        verify(auditLogService).record(1L, "DELETE_RECORD", "RECORD", 5L, "Soft deleted record: 5");
     }
 }

@@ -16,7 +16,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public List<com.finsight.dto.response.NotificationResponse> getDeadLetterQueue() {
         return notificationRepository.findByStatus("DEAD_LETTER")
                 .stream()

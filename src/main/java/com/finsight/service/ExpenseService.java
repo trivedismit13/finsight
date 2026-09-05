@@ -35,7 +35,7 @@ public class ExpenseService {
     @org.springframework.beans.factory.annotation.Autowired
     private ExpenseService self;
 
-    public ExpenseResponse createRecord(CreateExpenseRequest req, Long actorUserId) {
+    public ExpenseResponse createExpense(CreateExpenseRequest req, Long actorUserId) {
         // Idempotency: if the key already exists, return the existing record (200 OK at controller level)
         if (req.getIdempotencyKey() != null) {
             var existingOpt = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, req.getIdempotencyKey());
@@ -47,7 +47,7 @@ public class ExpenseService {
         }
 
         try {
-            return self.doCreateRecord(req, actorUserId);
+            return self.doCreateExpense(req, actorUserId);
         } catch (DataIntegrityViolationException e) {
             // Concurrent duplicate idempotency key — race condition between the check and the insert
             Expense existing = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, req.getIdempotencyKey())
@@ -58,7 +58,7 @@ public class ExpenseService {
     }
 
     @Transactional
-    public ExpenseResponse doCreateRecord(CreateExpenseRequest req, Long actorUserId) {
+    public ExpenseResponse doCreateExpense(CreateExpenseRequest req, Long actorUserId) {
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Actor user not found"));
 
@@ -87,8 +87,8 @@ public class ExpenseService {
     }
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAnyRole('VIEWER', 'ANALYST', 'ADMIN')")
-    public org.springframework.data.domain.Page<ExpenseResponse> getAllRecords(
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
+    public org.springframework.data.domain.Page<ExpenseResponse> getAllExpenses(
             String status,
             String category,
             java.time.LocalDate startDate,
@@ -147,7 +147,7 @@ public class ExpenseService {
     }
 
     @Transactional
-    public ExpenseResponse updateRecord(Long id, UpdateExpenseRequest req, Long actorUserId) {
+    public ExpenseResponse updateExpense(Long id, UpdateExpenseRequest req, Long actorUserId) {
         Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
@@ -180,7 +180,7 @@ public class ExpenseService {
     }
 
     @Transactional
-    public void deleteRecord(Long id, Long actorUserId) {
+    public void deleteExpense(Long id, Long actorUserId) {
         Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
@@ -268,7 +268,7 @@ public class ExpenseService {
     }
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public Expense saveRecordRequiresNew(Expense record) {
+    public Expense saveExpenseRequiresNew(Expense record) {
         return recordRepository.saveAndFlush(record);
     }
 

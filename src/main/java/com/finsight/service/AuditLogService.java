@@ -32,7 +32,7 @@ public class AuditLogService {
         auditLogRepository.save(log);
     }
     @Transactional(readOnly = true)
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public List<com.finsight.dto.response.AuditLogResponse> getAllAuditLogs() {
         return auditLogRepository.findAll().stream().map(log -> com.finsight.dto.response.AuditLogResponse.builder()
                 .auditId(log.getAuditId())

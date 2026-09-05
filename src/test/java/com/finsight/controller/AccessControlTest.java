@@ -42,14 +42,14 @@ class AccessControlTest {
 
     @Test
     void testMissingJwt_returns401() throws Exception {
-        mockMvc.perform(get("/api/records"))
+        mockMvc.perform(get("/api/expenses"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Authentication failed"));
     }
 
     @Test
     void testInvalidJwt_returns401() throws Exception {
-        mockMvc.perform(get("/api/records")
+        mockMvc.perform(get("/api/expenses")
                 .header("Authorization", "Bearer invalid.jwt.token.random.string"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid or expired token"));
@@ -67,7 +67,7 @@ class AccessControlTest {
                 .signWith(Keys.hmacShaKeyFor(secretKey.getBytes()), SignatureAlgorithm.HS256)
                 .compact();
 
-        mockMvc.perform(get("/api/records")
+        mockMvc.perform(get("/api/expenses")
                 .header("Authorization", "Bearer " + expiredToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid or expired token"));
@@ -78,7 +78,7 @@ class AccessControlTest {
         String validToken = jwtUtil.generateAccessToken("test@test.com", "EMPLOYEE", 1L);
         String tamperedToken = validToken.substring(0, validToken.length() - 5) + "abcde";
 
-        mockMvc.perform(get("/api/records")
+        mockMvc.perform(get("/api/expenses")
                 .header("Authorization", "Bearer " + tamperedToken))
                 .andExpect(status().isUnauthorized())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.message").value("Invalid or expired token"));

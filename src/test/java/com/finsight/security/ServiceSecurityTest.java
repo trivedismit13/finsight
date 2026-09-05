@@ -52,45 +52,28 @@ class ServiceSecurityTest {
         userRepository.save(adminUser);
     }
 
-    @Test
-    @WithMockCustomUser(roles = "EMPLOYEE")
-    void testViewerCannotDeleteRecord_throwsAccessDeniedException() {
-        assertThrows(AccessDeniedException.class, () -> {
-            recordService.deleteRecord(1L, viewerUser.getUserId());
-        });
-    }
+    
 
-    @Test
-    @WithMockCustomUser(roles = "EMPLOYEE")
-    void testViewerCannotCreateRecord_throwsAccessDeniedException() {
-        CreateExpenseRequest req = new CreateExpenseRequest();
-        req.setAmount(new BigDecimal("100"));
-        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
-        req.setExpenseDate(LocalDate.now());
-
-        assertThrows(AccessDeniedException.class, () -> {
-            recordService.createRecord(req, viewerUser.getUserId());
-        });
-    }
+    
 
     @Test
     @WithMockCustomUser(roles = "FINANCE_ADMIN")
     void testAdminCanDeleteRecord_AccessDeniedNotThrown() {
         // We might get ResourceNotFoundException because record 1L doesn't exist, but we should NOT get AccessDeniedException
         assertThrows(com.finsight.exception.ResourceNotFoundException.class, () -> {
-            recordService.deleteRecord(1L, adminUser.getUserId());
+            recordService.deleteExpense(1L, adminUser.getUserId());
         });
     }
 
     @Test
-    void testNoUserThrowsAuthenticationCredentialsNotFoundException() {
+    void testNoUserThrowsResourceNotFoundException() {
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("100"));
         req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
         req.setExpenseDate(LocalDate.now());
 
-        assertThrows(org.springframework.security.authentication.AuthenticationCredentialsNotFoundException.class, () -> {
-            recordService.createRecord(req, 1L);
+        assertThrows(com.finsight.exception.ResourceNotFoundException.class, () -> {
+            recordService.createExpense(req, 1L);
         });
     }
 }

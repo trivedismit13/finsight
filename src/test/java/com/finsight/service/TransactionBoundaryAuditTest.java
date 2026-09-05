@@ -82,7 +82,7 @@ class TransactionBoundaryAuditTest {
         req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
         req.setExpenseDate(LocalDate.now());
 
-        var response = expenseService.createRecord(req, testUser.getUserId());
+        var response = expenseService.createExpense(req, testUser.getUserId());
 
         assertTrue(recordRepository.findById(response.getExpenseId()).isPresent(), "Record must be saved");
         assertTrue(auditLogRepository.findAll().stream()
@@ -101,7 +101,7 @@ class TransactionBoundaryAuditTest {
         req.setExpenseDate(LocalDate.now());
 
         assertThrows(RuntimeException.class, () -> {
-            expenseService.createRecord(req, testUser.getUserId());
+            expenseService.createExpense(req, testUser.getUserId());
         });
 
         // Verify the record was rolled back

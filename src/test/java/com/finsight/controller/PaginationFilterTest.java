@@ -65,6 +65,7 @@ public class PaginationFilterTest {
         r2.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         r2.setExpenseDate(LocalDate.of(2026, 8, 15));
         r2.setCreatedBy(testUser);
+        r2.setStatus(com.finsight.model.ExpenseStatus.APPROVED);
         recordRepository.save(r2);
 
         Expense deleted = new Expense();
@@ -77,7 +78,7 @@ public class PaginationFilterTest {
 
         com.finsight.security.CustomUserDetails principal = new com.finsight.security.CustomUserDetails(
                 "test@example.com", "password", true, true, true, true,
-                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ANALYST")),
+                java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_EMPLOYEE")),
                 testUser.getUserId()
         );
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
@@ -88,7 +89,7 @@ public class PaginationFilterTest {
     @Test
     public void testPaginationAndSizeLimit() throws Exception {
         // Fetch with excessive size
-        mockMvc.perform(get("/api/records?page=0&size=10000")
+        mockMvc.perform(get("/api/expenses?page=0&size=10000")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.pageable.pageSize", is(100))) // clamped to max-page-size
@@ -98,34 +99,34 @@ public class PaginationFilterTest {
     @Test
     public void testFiltering() throws Exception {
         // Filter by type
-        mockMvc.perform(get("/api/records?type=EXPENSE")
+        mockMvc.perform(get("/api/expenses?status=DRAFT")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements", is(1))) // only r1, deleted is hidden
-                .andExpect(jsonPath("$.data.content[0].category", is("Food")));
+                .andExpect(jsonPath("$.data.content[0].category", is("MEALS")));
 
         // Filter by date range
-        mockMvc.perform(get("/api/records?startDate=2026-08-01&endDate=2026-08-10")
+        mockMvc.perform(get("/api/expenses?startDate=2026-08-01&endDate=2026-08-10")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements", is(1)));
 
         // Invalid date range
-        mockMvc.perform(get("/api/records?startDate=2026-08-10&endDate=2026-08-01")
+        mockMvc.perform(get("/api/expenses?startDate=2026-08-10&endDate=2026-08-01")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     public void testSortValidation() throws Exception {
-        mockMvc.perform(get("/api/records?sort=password")
+        mockMvc.perform(get("/api/expenses?sort=password")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     public void testInvalidPage() throws Exception {
-        mockMvc.perform(get("/api/records?page=-1")
+        mockMvc.perform(get("/api/expenses?page=-1")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }

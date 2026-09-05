@@ -37,22 +37,20 @@ public class ReportController {
     }
 
     @GetMapping("/expense-summary/{jobId}")
-    public ResponseEntity<ApiResponse<ReportJob>> getStatus(@PathVariable Long jobId,
+    public ResponseEntity<ApiResponse<ReportJobResponse>> getStatus(@PathVariable Long jobId,
             @AuthenticationPrincipal UserDetails principal) {
         Long userId = resolveUserId(principal);
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         
-        ReportJob job = reportService.getReportStatus(jobId, userId, isAdmin);
-        return ResponseEntity.ok(new ApiResponse<>("Job status", job));
+        ReportJob job = reportService.getReportStatus(jobId, userId);
+        return ResponseEntity.ok(new ApiResponse<>("Job status", ReportJobResponse.fromEntity(job)));
     }
 
     @GetMapping("/expense-summary/{jobId}/download")
     public ResponseEntity<org.springframework.core.io.Resource> downloadReport(@PathVariable Long jobId,
             @AuthenticationPrincipal UserDetails principal) {
         Long userId = resolveUserId(principal);
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
         
-        org.springframework.core.io.Resource resource = reportService.getReportDownloadResource(jobId, userId, isAdmin);
+        org.springframework.core.io.Resource resource = reportService.getReportDownloadResource(jobId, userId);
 
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"report-" + jobId + ".csv\"")

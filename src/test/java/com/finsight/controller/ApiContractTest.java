@@ -60,7 +60,7 @@ public class ApiContractTest {
     @Test
     @com.finsight.security.WithMockCustomUser(username = "finance_admin@example.com", roles = "FINANCE_ADMIN")
     public void testDeleteRecordReturns204NoContent() throws Exception {
-        mockMvc.perform(delete("/api/records/" + expenseId))
+        mockMvc.perform(delete("/api/expenses/" + expenseId))
                 .andExpect(status().isNoContent()); // HTTP 204
     }
 }

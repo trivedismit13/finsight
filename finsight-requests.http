@@ -1,155 +1,105 @@
 ### FinSight v2 - Manual Verification Postman / HTTP Client Checklist
 ### Run these sequentially against the running Spring Boot application (localhost:8080)
 
-### 1. Register Users
-### Register ADMIN
+### 1. Register Employee
 POST http://localhost:8080/api/auth/register
 Content-Type: application/json
 
 {
-  "name": "Admin Tester",
-  "email": "admin_test@finsight.com",
-  "password": "password"
+  "name": "Employee Tester",
+  "email": "employee@example.com",
+  "password": "password123"
 }
 
-### Register ANALYST
-POST http://localhost:8080/api/auth/register
-Content-Type: application/json
-
-{
-  "name": "Analyst Tester",
-  "email": "analyst_test@finsight.com",
-  "password": "password"
-}
-
-### Register VIEWER
-POST http://localhost:8080/api/auth/register
-Content-Type: application/json
-
-{
-  "name": "Viewer Tester",
-  "email": "viewer_test@finsight.com",
-  "password": "password"
-}
-
-### 2. Login as ADMIN
+### 2. Login as Employee
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "admin_test@finsight.com",
-  "password": "password"
+  "email": "employee@example.com",
+  "password": "password123"
 }
+> {% client.global.set("employee_token", response.body.data.accessToken); %}
 
-> {% 
-    client.global.set("admin_access_token", response.body.data.accessToken); 
-    client.global.set("admin_refresh_token", response.body.data.refreshToken);
-%}
-
-### 3. Fail login 5 times in a row (Lockout test)
+### 3. Login as Manager (Assuming seed data created manager@example.com)
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "viewer_test@finsight.com",
-  "password": "wrongpassword"
+  "email": "manager@example.com",
+  "password": "password123"
 }
+> {% client.global.set("manager_token", response.body.data.accessToken); %}
 
-### (Run the above 5 times, then run with correct password - expect 423 Locked)
-
-### 4. Call /api/auth/refresh
-POST http://localhost:8080/api/auth/refresh
+### 4. Login as Finance Admin (Assuming seed data created finance_admin@example.com)
+POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "refreshToken": "{{admin_refresh_token}}"
+  "email": "finance_admin@example.com",
+  "password": "password123"
 }
+> {% client.global.set("finance_token", response.body.data.accessToken); %}
 
-> {% 
-    client.global.set("admin_access_token", response.body.data.accessToken); 
-    // Now the old refresh token is invalid. Replaying it should 401.
-%}
 
-### 5. Create a record with idempotencyKey
-POST http://localhost:8080/api/records
-Authorization: Bearer {{admin_access_token}}
+### 5. Employee Create Expense (Idempotency check)
+POST http://localhost:8080/api/expenses
+Authorization: Bearer {{employee_token}}
 Content-Type: application/json
+Idempotency-Key: idem-key-001
 
 {
-  "adminId": 1,
   "amount": 150.00,
-  "type": "EXPENSE",
-  "category": "Office Supplies",
-  "recordDate": "2026-08-18",
-  "description": "Purchased pens",
-  "idempotencyKey": "idem-key-001"
+  "category": "OFFICE_SUPPLIES",
+  "expenseDate": "2026-08-18",
+  "description": "Purchased pens"
 }
 
-### (Run the above twice, confirm 200 OK and no duplicate on second run)
+### 6. Employee Submit Expense
+PUT http://localhost:8080/api/expenses/1/submit
+Authorization: Bearer {{employee_token}}
+Content-Type: application/json
 
-### 6. Update Record (Optimistic Locking)
-PUT http://localhost:8080/api/records/1
-Authorization: Bearer {{admin_access_token}}
+{}
+
+### 7. Manager List Team Expenses
+GET http://localhost:8080/api/expenses/team?status=PENDING_APPROVAL
+Authorization: Bearer {{manager_token}}
+
+### 8. Manager Approve Expense
+PUT http://localhost:8080/api/expenses/1/approve
+Authorization: Bearer {{manager_token}}
+Content-Type: application/json
+
+{}
+
+### 9. Finance Admin Process Expense
+PUT http://localhost:8080/api/expenses/1/process
+Authorization: Bearer {{finance_token}}
+Content-Type: application/json
+
+{}
+
+### 10. Finance Admin Creates Budget
+POST http://localhost:8080/api/budgets
+Authorization: Bearer {{finance_token}}
 Content-Type: application/json
 
 {
-  "adminId": 1,
-  "amount": 200.00,
-  "type": "EXPENSE",
-  "category": "Office Supplies",
-  "recordDate": "2026-08-18",
-  "description": "Purchased pens and paper",
-  "version": 0 
+  "category": "OFFICE_SUPPLIES",
+  "monthYear": "2026-08",
+  "limit": 1000.00
 }
 
-### (Run again with version 0, expect 409 Conflict)
+### 11. Finance Admin Dashboard Analytics
+GET http://localhost:8080/api/dashboards/summary?startDate=2026-08-01&endDate=2026-09-01
+Authorization: Bearer {{finance_token}}
 
-### 7. As VIEWER, attempt POST /api/records
-### First login as VIEWER
-POST http://localhost:8080/api/auth/login
+### 12. Finance Admin Request Report
+POST http://localhost:8080/api/reports/expense-summary?period=2026-08
+Authorization: Bearer {{finance_token}}
 Content-Type: application/json
 
-{
-  "email": "viewer_test@finsight.com",
-  "password": "password"
-}
-> {% client.global.set("viewer_access_token", response.body.data.accessToken); %}
-
-### Try to create
-POST http://localhost:8080/api/records
-Authorization: Bearer {{viewer_access_token}}
-Content-Type: application/json
-
-{
-  "adminId": 3,
-  "amount": 50.00,
-  "type": "EXPENSE",
-  "category": "Snacks",
-  "recordDate": "2026-08-18"
-}
-### Expect 403 Forbidden
-
-### 8. As ADMIN, check Audit Log
-GET http://localhost:8080/api/admin/audit
-Authorization: Bearer {{admin_access_token}}
-
-### Expect 200 and list of CREATE_RECORD, UPDATE_RECORD etc.
-
-### 9. As ANALYST, call export report
-### First login as ANALYST
-POST http://localhost:8080/api/auth/login
-Content-Type: application/json
-
-{
-  "email": "analyst_test@finsight.com",
-  "password": "password"
-}
-> {% client.global.set("analyst_access_token", response.body.data.accessToken); %}
-
-### Request Export
-POST http://localhost:8080/api/reports/export?userId=2&period=2026-08
-Authorization: Bearer {{analyst_access_token}}
-
-### Poll Export Status (replace jobId)
-GET http://localhost:8080/api/reports/export/1
-Authorization: Bearer {{analyst_access_token}}
+### 13. Finance Admin Check Audit Logs
+GET http://localhost:8080/api/audit
+Authorization: Bearer {{finance_token}}

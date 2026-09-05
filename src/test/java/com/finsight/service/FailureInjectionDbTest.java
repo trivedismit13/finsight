@@ -100,7 +100,7 @@ public class FailureInjectionDbTest {
         req.setIdempotencyKey("PARTIAL_FAIL_KEY");
 
         // The transaction should completely rollback
-        assertThrows(RuntimeException.class, () -> recordService.createRecord(req, testUser.getUserId()));
+        assertThrows(RuntimeException.class, () -> recordService.createExpense(req, testUser.getUserId()));
 
         // Verify that NO partial state exists (the financial record should be gone)
         long recordCount = recordRepository.count();
@@ -137,7 +137,7 @@ public class FailureInjectionDbTest {
             req.setExpenseDate(LocalDate.of(2026, 8, 1));
             
             try {
-                recordService.createRecord(req, testUser.getUserId());
+                recordService.createExpense(req, testUser.getUserId());
             } catch (Exception e) {
             }
 

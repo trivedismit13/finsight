@@ -94,6 +94,7 @@ class NPlusOneQueryAuditTest {
             // Create Notification
             Notification n = new Notification();
             n.setUserId(u);
+            n.setType("TEST");
             n.setPayload("sensitive payload");
             n.setStatus("DEAD_LETTER");
             n.setDeadLetterReason("Test");
@@ -115,7 +116,7 @@ class NPlusOneQueryAuditTest {
     void testExpensesNPlusOneAndSerialization() throws Exception {
         hibernateStatistics.clear();
         
-        mockMvc.perform(get("/api/records?page=0&size=20"))
+        mockMvc.perform(get("/api/expenses?page=0&size=20"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content", hasSize(20)))
                 .andExpect(jsonPath("$.data.content[0].createdByName", notNullValue()))

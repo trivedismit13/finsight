@@ -285,26 +285,22 @@ public class ReportExportService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
-    public ReportJob getReportStatus(Long jobId, Long userId, boolean isAdmin) {
+    public ReportJob getReportStatus(Long jobId, Long userId) {
         ReportJob job = reportJobRepository.findById(jobId)
                 .orElseThrow(() -> new com.finsight.exception.ResourceNotFoundException("Job not found: " + jobId));
 
-        if (!isAdmin && !job.getRequestedBy().getUserId().equals(userId)) {
-            throw new com.finsight.exception.UnauthorizedAccessException("Not authorized to access this report job");
-        }
-
+        // Since only FINANCE_ADMIN can call this method via @PreAuthorize, we don't need additional ownership checks
+        
         return job;
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
-    public org.springframework.core.io.Resource getReportDownloadResource(Long jobId, Long userId, boolean isAdmin) {
+    public org.springframework.core.io.Resource getReportDownloadResource(Long jobId, Long userId) {
         ReportJob job = reportJobRepository.findById(jobId)
                 .orElseThrow(() -> new com.finsight.exception.ResourceNotFoundException("Job not found: " + jobId));
 
-        if (!isAdmin && !job.getRequestedBy().getUserId().equals(userId)) {
-            throw new com.finsight.exception.UnauthorizedAccessException("Not authorized to download this report");
-        }
+        // Since only FINANCE_ADMIN can call this method via @PreAuthorize, we don't need additional ownership checks
 
         if (!"COMPLETED".equals(job.getStatus()) || job.getFilePath() == null) {
             throw new com.finsight.exception.InvalidRequestException("Report is not ready for download");

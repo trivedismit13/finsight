@@ -29,7 +29,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
      */
     @Query("SELECT COALESCE(SUM(r.amount), 0) FROM Expense r " +
            "WHERE r.category = :category " +
-           "AND r.status IN ('APPROVED', 'PROCESSED') " +
+           "AND r.status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PROCESSED') " +
            "AND r.isDeleted = false " +
            "AND r.expenseDate >= :startDate AND r.expenseDate < :endDateExclusive")
     BigDecimal sumExpensesByCategoryAndDateRange(@Param("category") com.finsight.model.ExpenseCategory category,

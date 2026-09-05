@@ -15,9 +15,6 @@ public class CreateExpenseRequest {
     @jakarta.validation.constraints.Digits(integer = 13, fraction = 2)
     private BigDecimal amount;
 
-    @NotBlank
-    @jakarta.validation.constraints.Pattern(regexp = "^(INCOME|EXPENSE)$", message = "Type must be INCOME or EXPENSE")
-    private String type; // INCOME or EXPENSE
 
     @NotBlank
     private String category;

@@ -74,7 +74,7 @@ public class ReportExportService {
     }
 
     @org.springframework.transaction.annotation.Transactional
-    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public Long requestReport(Long userId, String period) {
         // Validation: Verify it is a true YearMonth (not just regex)
         try {
@@ -284,7 +284,7 @@ public class ReportExportService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public ReportJob getReportStatus(Long jobId, Long userId, boolean isAdmin) {
         ReportJob job = reportJobRepository.findById(jobId)
                 .orElseThrow(() -> new com.finsight.exception.ResourceNotFoundException("Job not found: " + jobId));
@@ -297,7 +297,7 @@ public class ReportExportService {
     }
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
-    @PreAuthorize("hasAnyRole('ANALYST', 'ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public org.springframework.core.io.Resource getReportDownloadResource(Long jobId, Long userId, boolean isAdmin) {
         ReportJob job = reportJobRepository.findById(jobId)
                 .orElseThrow(() -> new com.finsight.exception.ResourceNotFoundException("Job not found: " + jobId));

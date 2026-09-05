@@ -35,7 +35,6 @@ public class ExpenseService {
     @org.springframework.beans.factory.annotation.Autowired
     private ExpenseService self;
 
-    @PreAuthorize("hasRole('ADMIN')")
     public ExpenseResponse createRecord(CreateExpenseRequest req, Long actorUserId) {
         // Idempotency: if the key already exists, return the existing record (200 OK at controller level)
         if (req.getIdempotencyKey() != null) {
@@ -254,12 +253,17 @@ public class ExpenseService {
     private void verifyIdempotencyPayloadMatch(Expense existing, CreateExpenseRequest req) {
         boolean descMatch = (existing.getDescription() == null && req.getDescription() == null) ||
                 (existing.getDescription() != null && existing.getDescription().equals(req.getDescription()));
-        if (existing.getAmount().compareTo(req.getAmount()) != 0 ||
-            !existing.getStatus().name().equals(req.getType()) ||
-            !existing.getCategory().equals(ExpenseCategory.valueOf(req.getCategory())) ||
-            !existing.getExpenseDate().equals(req.getExpenseDate()) ||
-            !descMatch) {
-            throw new IllegalArgumentException("Idempotency key already used with a different payload");
+        if (existing.getAmount().compareTo(req.getAmount()) != 0) {
+            throw new IllegalArgumentException("Idempotency key already used with a different amount: " + existing.getAmount() + " vs " + req.getAmount());
+        }
+        if (!existing.getCategory().name().equals(req.getCategory())) {
+            throw new IllegalArgumentException("Idempotency key already used with a different category: " + existing.getCategory() + " vs " + req.getCategory());
+        }
+        if (!existing.getExpenseDate().equals(req.getExpenseDate())) {
+            throw new IllegalArgumentException("Idempotency key already used with a different date: " + existing.getExpenseDate() + " vs " + req.getExpenseDate());
+        }
+        if (!descMatch) {
+            throw new IllegalArgumentException("Idempotency key already used with a different description");
         }
     }
 

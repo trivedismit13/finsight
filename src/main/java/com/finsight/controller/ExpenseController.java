@@ -106,7 +106,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasAnyRole('MANAGER', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> approve(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {
@@ -116,7 +116,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasAnyRole('MANAGER', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('MANAGER')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> reject(
             @PathVariable Long id,
             @Valid @RequestBody RejectExpenseRequest req,

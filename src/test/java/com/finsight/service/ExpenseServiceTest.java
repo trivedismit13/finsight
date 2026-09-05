@@ -136,7 +136,7 @@ public class ExpenseServiceTest {
         ExpenseResponse result = recordService.updateExpense(5L, req, 1L);
 
         assertNotNull(result);
-        verify(auditLogService).record(eq(1L), eq("UPDATE_RECORD"), eq("RECORD"), eq(5L), anyString());
+        verify(auditLogService).record(eq(1L), eq("UPDATE_EXPENSE"), eq("EXPENSE"), eq(5L), anyString());
     }
 
     /**
@@ -266,6 +266,6 @@ public class ExpenseServiceTest {
 
         assertTrue(record.isDeleted());
         verify(recordRepository).save(record);
-        verify(auditLogService).record(eq(1L), eq("DELETE_RECORD"), eq("RECORD"), eq(5L), eq("Deleted record: 5"));
+        verify(auditLogService).record(eq(1L), eq("DELETE_EXPENSE"), eq("EXPENSE"), eq(5L), eq("Deleted record: 5"));
     }
 }

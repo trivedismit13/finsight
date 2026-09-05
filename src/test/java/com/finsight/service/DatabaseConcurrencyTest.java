@@ -56,6 +56,9 @@ public class DatabaseConcurrencyTest {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     
     @Autowired
     private ExpenseRepository recordRepository;
@@ -90,7 +93,7 @@ public class DatabaseConcurrencyTest {
         user.setName("Concurrency Test User");
         user.setEmail("concurrency@example.com");
         // encode a password for auth test
-        user.setPassword("$2a$10$rN2h2U2/k4p4O1j6QpD4cOO3xXl2vW1VpXpC6U7V8vV1XpXpXpXpX"); // fake hash
+        user.setPassword(passwordEncoder.encode("correct-password")); // actual hash
         user.setRole(com.finsight.model.Role.EMPLOYEE);
         testUser = userRepository.save(user);
     }
@@ -103,6 +106,7 @@ public class DatabaseConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
 
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
@@ -111,10 +115,10 @@ public class DatabaseConcurrencyTest {
                     req.setEmail(testUser.getEmail());
                     req.setPassword("wrong-password");
                     authService.login(req);
-                } catch (InvalidCredentialsException e) {
+                } catch (InvalidCredentialsException | com.finsight.exception.AccountLockedException e) {
                     // expected
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -129,6 +133,7 @@ public class DatabaseConcurrencyTest {
         // The remaining 5 attempts will throw AccountLockedException before incrementing.
         assertEquals(5, updatedUser.getFailedLoginAttempts(), "Failed login attempts should cap at 5 due to lockout");
         assertNotNull(updatedUser.getLockedUntil(), "Account should be locked");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
 
@@ -148,6 +153,7 @@ public class DatabaseConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
 
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         AtomicInteger successCount = new AtomicInteger(0);
         AtomicInteger lockFailureCount = new AtomicInteger(0);
 
@@ -185,6 +191,7 @@ public class DatabaseConcurrencyTest {
 
         assertEquals(1, successCount.get(), "Only one update should succeed");
         assertEquals(1, lockFailureCount.get(), "One update should fail with OptimisticLockingFailureException");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
 
@@ -212,6 +219,7 @@ public class DatabaseConcurrencyTest {
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         final org.springframework.security.core.context.SecurityContext ctx = org.springframework.security.core.context.SecurityContextHolder.getContext();
 
         for (int i = 0; i < threadCount; i++) {
@@ -223,7 +231,7 @@ public class DatabaseConcurrencyTest {
                         budgetService.checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory.MEALS.name(), "2026-08", testUser.getUserId());
                     });
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -239,6 +247,7 @@ public class DatabaseConcurrencyTest {
         List<Notification> notifications = notificationRepository.findAll();
         // Since we enforced atomic updates on budget alert flag, we should only have EXACTLY 1 notification created
         assertEquals(1, notifications.size(), "Only ONE budget notification should have been generated despite 2 concurrent limit breaks");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
 
@@ -288,6 +297,7 @@ public class DatabaseConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
         
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         AtomicInteger successfulClaims = new AtomicInteger(0);
         
         for (int i = 0; i < threadCount; i++) {
@@ -300,7 +310,7 @@ public class DatabaseConcurrencyTest {
                         successfulClaims.incrementAndGet();
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -311,6 +321,7 @@ public class DatabaseConcurrencyTest {
         assertTrue(done.await(5, TimeUnit.SECONDS));
         
         assertEquals(1, successfulClaims.get(), "Only exactly ONE worker should successfully claim the notification");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
 
@@ -333,6 +344,7 @@ public class DatabaseConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
         
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
@@ -340,7 +352,7 @@ public class DatabaseConcurrencyTest {
                     // Assume both workers think they are processing it and both fail it
                     notificationQueueManager.handleFailure(notifId);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -352,6 +364,7 @@ public class DatabaseConcurrencyTest {
         
         Notification updated = notificationRepository.findById(notifId).orElseThrow();
         assertEquals(2, updated.getRetryCount(), "Retry count should only increment once because the stale worker's atomic update will return 0 and be ignored");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
 
@@ -371,6 +384,7 @@ public class DatabaseConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
         
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         AtomicInteger successfulClaims = new AtomicInteger(0);
         
         for (int i = 0; i < threadCount; i++) {
@@ -382,7 +396,7 @@ public class DatabaseConcurrencyTest {
                         successfulClaims.incrementAndGet();
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -393,6 +407,7 @@ public class DatabaseConcurrencyTest {
         assertTrue(done.await(5, TimeUnit.SECONDS));
         
         assertEquals(1, successfulClaims.get(), "Only exactly ONE worker should successfully claim the report job");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
 
@@ -428,9 +443,9 @@ public class DatabaseConcurrencyTest {
         CountDownLatch latch = new CountDownLatch(1);
         CountDownLatch done = new CountDownLatch(threadCount);
 
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         AtomicInteger successfulResponses = new AtomicInteger(0);
         String idempotencyKey = "CONCURRENT_KEY";
-        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         final org.springframework.security.core.context.SecurityContext ctx = org.springframework.security.core.context.SecurityContextHolder.getContext();
 
         for (int i = 0; i < threadCount; i++) {
@@ -461,6 +476,7 @@ public class DatabaseConcurrencyTest {
 
         long recordCount = recordRepository.count();
         assertEquals(1, recordCount, "Exactly ONE financial record should be created in the database");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
     // Test 10 — Notification Workers (Test D)
@@ -509,4 +525,73 @@ public class DatabaseConcurrencyTest {
             assertNotEquals("PROCESSING", n.getStatus(), "No task should be stuck in PROCESSING");
         }
     }
+
+    // Test 11 - Approval/Rejection Concurrency
+    @Test
+    void testApproveRejectConcurrency() throws InterruptedException {
+        // Create an expense
+        Expense record = new Expense();
+        record.setCreatedBy(testUser);
+        record.setAmount(new BigDecimal("500.00"));
+        record.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
+        record.setExpenseDate(LocalDate.now());
+        record.setStatus(com.finsight.model.ExpenseStatus.PENDING_APPROVAL);
+        Expense savedRecord = recordRepository.save(record);
+        
+        // Create a manager
+        User manager = new User();
+        manager.setName("Manager");
+        manager.setEmail("manager@example.com");
+        manager.setPassword(passwordEncoder.encode("manager-pass"));
+        manager.setRole(com.finsight.model.Role.MANAGER);
+        User savedManager = userRepository.save(manager);
+        
+        testUser.setManager(savedManager);
+        userRepository.save(testUser);
+        
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+        
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> concurrencyExceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        
+        // Thread 1: Approve
+        executor.submit(() -> {
+            try {
+                latch.await();
+                recordService.approveExpense(savedRecord.getExpenseId(), savedManager.getUserId());
+            } catch (Exception e) {
+                concurrencyExceptions.add(e);
+            } finally {
+                done.countDown();
+            }
+        });
+        
+        // Thread 2: Reject
+        executor.submit(() -> {
+            try {
+                latch.await();
+                recordService.rejectExpense(savedRecord.getExpenseId(), savedManager.getUserId(), "Rejecting");
+            } catch (Exception e) {
+                concurrencyExceptions.add(e);
+            } finally {
+                done.countDown();
+            }
+        });
+        
+        latch.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        
+        Expense finalState = recordRepository.findById(savedRecord.getExpenseId()).orElseThrow();
+        
+        // Exactly one should succeed, one should fail (throw an exception like ObjectOptimisticLockingFailureException or IllegalStateException)
+        assertEquals(1, concurrencyExceptions.size(), "Exactly one transaction should fail due to concurrent modification");
+        
+        // Ensure final state is either APPROVED or REJECTED
+        assertTrue(finalState.getStatus() == com.finsight.model.ExpenseStatus.APPROVED || finalState.getStatus() == com.finsight.model.ExpenseStatus.REJECTED);
+        
+        executor.shutdown();
+    }
+
 }

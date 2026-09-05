@@ -86,7 +86,7 @@ class TransactionBoundaryAuditTest {
 
         assertTrue(recordRepository.findById(response.getExpenseId()).isPresent(), "Record must be saved");
         assertTrue(auditLogRepository.findAll().stream()
-                .anyMatch(a -> a.getEntityId().equals(response.getExpenseId()) && "RECORD".equals(a.getEntityType())), 
+                .anyMatch(a -> a.getEntityId().equals(response.getExpenseId()) && "EXPENSE".equals(a.getEntityType())), 
                 "Audit log must be saved");
     }
 

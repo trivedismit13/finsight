@@ -75,7 +75,7 @@ public class ExpenseService {
         record = recordRepository.saveAndFlush(record);
 
         // Audit log (REQUIRED — atomic with the business transaction, rolls back if this tx rolls back)
-        auditLogService.record(actorUserId, "CREATE_RECORD", "RECORD", record.getExpenseId(),
+        auditLogService.record(actorUserId, "CREATE_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Created record: " + record.getExpenseId());
 
 
@@ -101,7 +101,7 @@ public class ExpenseService {
 
         // Validate allowed sort fields
         if (pageable.getSort().isSorted()) {
-            java.util.List<String> allowedFields = java.util.Arrays.asList("amount", "type", "category", "expenseDate", "createdAt", "updatedAt");
+            java.util.List<String> allowedFields = java.util.Arrays.asList("amount", "category", "expenseDate", "createdAt", "updatedAt");
             for (org.springframework.data.domain.Sort.Order order : pageable.getSort()) {
                 if (!allowedFields.contains(order.getProperty())) {
                     throw new com.finsight.exception.InvalidRequestException("Invalid sort field: " + order.getProperty());
@@ -119,10 +119,13 @@ public class ExpenseService {
             if (actor.getRole() == Role.FINANCE_ADMIN) {
                 // COMPANY scope: Can see all records
             } else if (actor.getRole() == Role.MANAGER) {
-                // TEAM scope: Can see own records AND records of users they manage
+                // TEAM scope: Can see own records AND records of users they manage (excluding DRAFT)
                 predicates.add(cb.or(
                         cb.equal(root.get("createdBy").get("userId"), actorId),
-                        cb.equal(root.get("createdBy").get("manager").get("userId"), actorId)
+                        cb.and(
+                            cb.equal(root.get("createdBy").get("manager").get("userId"), actorId),
+                            cb.notEqual(root.get("status"), ExpenseStatus.DRAFT)
+                        )
                 ));
             } else {
                 // EMPLOYEE scope: Can see only own records
@@ -180,7 +183,7 @@ public class ExpenseService {
 
         record = recordRepository.save(record);
 
-        auditLogService.record(actorUserId, "UPDATE_RECORD", "RECORD", record.getExpenseId(),
+        auditLogService.record(actorUserId, "UPDATE_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Updated record from [" + oldState + "] to [" + record.getAmount() + "|" + record.getCategory() + "]");
 
         return toResponse(record);
@@ -202,7 +205,7 @@ public class ExpenseService {
         record.setDeleted(true);
         recordRepository.save(record);
 
-        auditLogService.record(actorUserId, "DELETE_RECORD", "RECORD", record.getExpenseId(),
+        auditLogService.record(actorUserId, "DELETE_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Deleted record: " + record.getExpenseId());
     }
 
@@ -223,7 +226,7 @@ public class ExpenseService {
         record.setSubmittedAt(LocalDateTime.now());
         record = recordRepository.save(record);
 
-        auditLogService.record(actorUserId, "SUBMIT_EXPENSE", "RECORD", record.getExpenseId(),
+        auditLogService.record(actorUserId, "SUBMIT_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Submitted record: " + record.getExpenseId());
 
         return toResponse(record);
@@ -303,7 +306,7 @@ public class ExpenseService {
         record.setApprovedBy(manager);
         record = recordRepository.save(record);
 
-        auditLogService.record(managerId, "APPROVE_EXPENSE", "RECORD", record.getExpenseId(),
+        auditLogService.record(managerId, "APPROVE_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Approved record: " + record.getExpenseId());
 
         notificationDispatcherService.enqueueNotification(
@@ -340,7 +343,7 @@ public class ExpenseService {
         record.setRejectionReason(reason);
         record = recordRepository.save(record);
 
-        auditLogService.record(managerId, "REJECT_EXPENSE", "RECORD", record.getExpenseId(),
+        auditLogService.record(managerId, "REJECT_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Rejected record: " + record.getExpenseId());
 
         notificationDispatcherService.enqueueNotification(
@@ -365,7 +368,7 @@ public class ExpenseService {
         record.setStatus(ExpenseStatus.PROCESSED);
         record = recordRepository.save(record);
 
-        auditLogService.record(adminId, "PROCESS_EXPENSE", "RECORD", record.getExpenseId(),
+        auditLogService.record(adminId, "PROCESS_EXPENSE", "EXPENSE", record.getExpenseId(),
                 "Processed expense");
 
         notificationDispatcherService.enqueueNotification(

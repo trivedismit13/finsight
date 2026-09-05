@@ -85,12 +85,12 @@ public class EndToEndScenarioTest {
         // --- Step 1: Register ---
         registerUser("Viewer", "employee@example.com", "password123", "EMPLOYEE");
         registerUser("Analyst", "manager@example.com", "password123", "MANAGER");
-        registerUser("Admin", "finance_admin@example.com", "password123", "FINANCE_ADMIN");
+        registerUser("Admin", "finance_finance_admin@example.com", "password123", "FINANCE_ADMIN");
 
         // --- Step 2: Login each user ---
         employeeToken = loginUser("employee@example.com", "password123");
         managerToken = loginUser("manager@example.com", "password123");
-        financeAdminToken = loginUser("finance_admin@example.com", "password123");
+        financeAdminToken = loginUser("finance_finance_admin@example.com", "password123");
 
         assertNotNull(employeeToken);
         assertNotNull(managerToken);
@@ -104,7 +104,7 @@ public class EndToEndScenarioTest {
                 .param("limit", "100.00"))
                 .andExpect(status().isForbidden()); // 403
 
-        // --- Step 4: Admin creates records with idempotency key ---
+        // --- Step 4: Finance Admin creates records with idempotency key ---
         CreateExpenseRequest createReq = new CreateExpenseRequest();
         createReq.setAmount(new BigDecimal("100000.00"));
         createReq.setCategory(com.finsight.model.ExpenseCategory.OTHER);

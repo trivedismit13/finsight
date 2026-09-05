@@ -7,7 +7,7 @@ Content-Type: application/json
 
 {
   "name": "Employee Tester",
-  "email": "employee@example.com",
+  "email": "employee@finsight.com",
   "password": "password123"
 }
 
@@ -16,27 +16,27 @@ POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "employee@example.com",
+  "email": "employee@finsight.com",
   "password": "password123"
 }
 > {% client.global.set("employee_token", response.body.data.accessToken); %}
 
-### 3. Login as Manager (Assuming seed data created manager@example.com)
+### 3. Login as Manager (Assuming seed data created manager@finsight.com)
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "manager@example.com",
+  "email": "manager@finsight.com",
   "password": "password123"
 }
 > {% client.global.set("manager_token", response.body.data.accessToken); %}
 
-### 4. Login as Finance Admin (Assuming seed data created finance_admin@example.com)
+### 4. Login as Finance Admin (Assuming seed data created admin@finsight.com)
 POST http://localhost:8080/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "finance_admin@example.com",
+  "email": "admin@finsight.com",
   "password": "password123"
 }
 > {% client.global.set("finance_token", response.body.data.accessToken); %}
@@ -56,7 +56,7 @@ Idempotency-Key: idem-key-001
 }
 
 ### 6. Employee Submit Expense
-PUT http://localhost:8080/api/expenses/1/submit
+POST http://localhost:8080/api/expenses/1/submit
 Authorization: Bearer {{employee_token}}
 Content-Type: application/json
 
@@ -67,14 +67,14 @@ GET http://localhost:8080/api/expenses/team?status=PENDING_APPROVAL
 Authorization: Bearer {{manager_token}}
 
 ### 8. Manager Approve Expense
-PUT http://localhost:8080/api/expenses/1/approve
+POST http://localhost:8080/api/expenses/1/approve
 Authorization: Bearer {{manager_token}}
 Content-Type: application/json
 
 {}
 
 ### 9. Finance Admin Process Expense
-PUT http://localhost:8080/api/expenses/1/process
+POST http://localhost:8080/api/expenses/admin/1/process
 Authorization: Bearer {{finance_token}}
 Content-Type: application/json
 
@@ -92,7 +92,7 @@ Content-Type: application/json
 }
 
 ### 11. Finance Admin Dashboard Analytics
-GET http://localhost:8080/api/dashboards/summary?startDate=2026-08-01&endDate=2026-09-01
+GET http://localhost:8080/api/analytics/company?startDate=2026-08-01&endDate=2026-09-01
 Authorization: Bearer {{finance_token}}
 
 ### 12. Finance Admin Request Report

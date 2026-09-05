@@ -129,7 +129,7 @@ public class AuditIntegrationTest {
         Long expenseId = record.getExpenseId();
 
         doThrow(new RuntimeException("Audit DB Down")).when(auditLogService)
-                .record(any(), eq("DELETE_RECORD"), anyString(), any(), anyString());
+                .record(any(), eq("DELETE_EXPENSE"), anyString(), any(), anyString());
 
         try {
             expenseService.deleteExpense(expenseId, testUser.getUserId());

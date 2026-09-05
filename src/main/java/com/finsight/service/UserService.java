@@ -21,7 +21,7 @@ public class UserService {
 
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public List<UserResponse> getAllUsers() {
-        return userRepository.findByIsActiveTrue().stream()
+        return userRepository.findAll().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -34,6 +34,10 @@ public class UserService {
 
         String oldRole = user.getRole().name();
         boolean oldActive = user.isActive();
+
+        if (userId.equals(actorUserId) && (role != user.getRole() || isActive != user.isActive())) {
+            throw new com.finsight.exception.InvalidRequestException("Users cannot change their own role or active status");
+        }
 
         user.setRole(role);
         user.setActive(isActive);
@@ -54,11 +58,15 @@ public class UserService {
 
         Long oldManagerId = user.getManager() != null ? user.getManager().getUserId() : null;
 
+        if (user.getRole() != Role.EMPLOYEE) {
+            throw new com.finsight.exception.InvalidRequestException("Only EMPLOYEE can be assigned a manager");
+        }
+
         if (managerId != null) {
             User manager = userRepository.findById(managerId)
                     .orElseThrow(() -> new ResourceNotFoundException("Manager not found: " + managerId));
-            if (manager.getRole() != Role.MANAGER && manager.getRole() != Role.FINANCE_ADMIN) {
-                throw new com.finsight.exception.InvalidRequestException("Assigned manager must have MANAGER or FINANCE_ADMIN role");
+            if (manager.getRole() != Role.MANAGER) {
+                throw new com.finsight.exception.InvalidRequestException("Assigned manager must have MANAGER role");
             }
             if (manager.getUserId().equals(user.getUserId())) {
                 throw new com.finsight.exception.InvalidRequestException("User cannot be their own manager");

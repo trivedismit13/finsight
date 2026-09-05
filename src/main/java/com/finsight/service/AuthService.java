@@ -129,20 +129,17 @@ public class AuthService {
         RefreshToken token = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new InvalidRefreshTokenException("Invalid refresh token"));
 
-        if (token.isRevoked()) {
+        int updatedRows = refreshTokenRepository.consumeTokenAtomically(token.getTokenId(), LocalDateTime.now());
+        if (updatedRows == 0) {
+            // Check if it failed because it was expired
+            if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+                throw new InvalidRefreshTokenException("Refresh token expired");
+            }
+            // If not expired, it means it was already consumed (revoked = true).
             // THEFT SIGNAL: this token was already rotated out; someone replayed it
             revokeAllTokensForUser(token.getUser());
             throw new InvalidRefreshTokenException("Session invalidated, please log in again");
         }
-
-        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new InvalidRefreshTokenException("Refresh token expired");
-        }
-
-        // Valid — rotate: revoke old, issue new
-        token.setRevoked(true);
-        token.setRevokedAt(LocalDateTime.now());
-        refreshTokenRepository.save(token);
 
         User user = token.getUser();
         String newRawRefreshToken = issueRefreshToken(user, token.getTokenId());

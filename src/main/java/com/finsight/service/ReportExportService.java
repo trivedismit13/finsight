@@ -2,6 +2,7 @@ package com.finsight.service;
 
 import com.finsight.model.Expense;
 import com.finsight.model.ReportJob;
+import com.finsight.model.Role;
 import com.finsight.model.User;
 import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.ReportJobRepository;
@@ -140,7 +141,7 @@ public class ReportExportService {
             // Eagerly fetch necessary data inside a minimal transaction/method, but here we can just use the repository to fetch what we need.
             // Since we need to know if the user is ADMIN, let's fetch the User directly.
             User requestedBy = userRepository.findById(job.getRequestedBy().getUserId()).orElseThrow();
-            boolean isAdmin = com.finsight.model.Role.FINANCE_ADMIN.equals(requestedBy.getRole());
+            Role userRole = requestedBy.getRole();
             java.time.YearMonth ym = java.time.YearMonth.parse(job.getPeriod());
             java.time.LocalDate startDate = ym.atDay(1);
             java.time.LocalDate endDateExclusive = ym.plusMonths(1).atDay(1);
@@ -153,7 +154,7 @@ public class ReportExportService {
                 org.springframework.data.domain.Slice<Expense> slice;
 
                 do {
-                    slice = self.fetchAndWriteReportChunk(isAdmin, requestedBy.getUserId(), startDate, endDateExclusive, pageable, writer);
+                    slice = self.fetchAndWriteReportChunk(userRole, requestedBy.getUserId(), startDate, endDateExclusive, pageable, writer);
                     pageable = slice.nextPageable();
                 } while (slice.hasNext());
             }
@@ -189,12 +190,14 @@ public class ReportExportService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public org.springframework.data.domain.Slice<Expense> fetchAndWriteReportChunk(
-            boolean isAdmin, Long userId, java.time.LocalDate startDate, java.time.LocalDate endDateExclusive,
+            Role userRole, Long userId, java.time.LocalDate startDate, java.time.LocalDate endDateExclusive,
             org.springframework.data.domain.Pageable pageable, BufferedWriter writer) throws java.io.IOException {
             
         org.springframework.data.domain.Slice<Expense> slice;
-        if (isAdmin) {
+        if (userRole == Role.FINANCE_ADMIN) {
             slice = expenseRepository.findByDateRange(startDate, endDateExclusive, pageable);
+        } else if (userRole == Role.MANAGER) {
+            slice = expenseRepository.findTeamByDateRange(userId, startDate, endDateExclusive, pageable);
         } else {
             slice = expenseRepository.findByUserAndDateRange(userId, startDate, endDateExclusive, pageable);
         }

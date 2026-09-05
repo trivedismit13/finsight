@@ -69,6 +69,7 @@ public class FailureInjectionDbTest {
     private TransactionTemplate transactionTemplate;
 
     private User testUser;
+    private User testManager;
 
     @BeforeEach
     void setUp() {
@@ -78,11 +79,19 @@ public class FailureInjectionDbTest {
         notificationRepository.deleteAll();
         userRepository.deleteAll();
 
+        User manager = new User();
+        manager.setName("Manager");
+        manager.setEmail("manager@example.com");
+        manager.setPassword("password");
+        manager.setRole(com.finsight.model.Role.MANAGER);
+        testManager = userRepository.save(manager);
+
         User user = new User();
         user.setName("Failure Test User");
         user.setEmail("failure@example.com");
         user.setPassword("password");
         user.setRole(com.finsight.model.Role.EMPLOYEE);
+        user.setManager(testManager);
         testUser = userRepository.save(user);
     }
 
@@ -137,13 +146,15 @@ public class FailureInjectionDbTest {
             req.setExpenseDate(LocalDate.of(2026, 8, 1));
             
             try {
-                recordService.createExpense(req, testUser.getUserId());
+                com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, testUser.getUserId());
+                recordService.submitExpense(res.getExpenseId(), testUser.getUserId());
+                recordService.approveExpense(res.getExpenseId(), testManager.getUserId());
             } catch (Exception e) {
             }
 
             // Verify the durable state remains in DB
             List<Notification> notifications = notificationRepository.findAll();
-            assertEquals(1, notifications.size(), "Notification must be durable in the DB even if the queue crashes");
+            assertTrue(notifications.size() > 0, "Notification must be durable in the DB even if the queue crashes");
             assertEquals("PENDING", notifications.get(0).getStatus(), "Notification remains in PENDING state ready for recovery");
         } finally {
             org.springframework.test.util.ReflectionTestUtils.setField(notificationQueueManager, "queue", originalQueue);

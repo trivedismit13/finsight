@@ -145,19 +145,22 @@ class AuthServiceTest {
         oldToken.setRevoked(false);
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(oldToken));
+        when(refreshTokenRepository.consumeTokenAtomically(eq(oldToken.getTokenId()), any(LocalDateTime.class))).thenReturn(1);
         when(jwtUtil.generateAccessToken(anyString(), anyString(), anyLong())).thenReturn("new_access");
+        
+        when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(i -> {
+            RefreshToken t = i.getArgument(0);
+            t.setTokenId(101L);
+            return t;
+        });
 
         RefreshTokenRequest req = new RefreshTokenRequest();
         req.setRefreshToken(rawToken);
 
         var resp = authService.refreshAccessToken(req);
 
-        // Old token must be revoked
-        assertTrue(oldToken.isRevoked());
-        assertNotNull(oldToken.getRevokedAt());
-
-        // Both save calls: one for the old token revocation, one for the new token
-        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+        // Only one save call: for the new token (old token was updated atomically)
+        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
 
         // The returned refresh token must not be the same as the original
         assertNotEquals(rawToken, resp.getRefreshToken());
@@ -183,7 +186,10 @@ class AuthServiceTest {
         RefreshToken otherActiveSession = new RefreshToken();
         otherActiveSession.setRevoked(false);
 
+        stolenToken.setExpiresAt(LocalDateTime.now().plusDays(1)); // Prevents NPE
+
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(stolenToken));
+        when(refreshTokenRepository.consumeTokenAtomically(eq(stolenToken.getTokenId()), any(LocalDateTime.class))).thenReturn(0);
         when(refreshTokenRepository.findAllByUser_UserIdAndRevokedFalse(testUser.getUserId()))
                 .thenReturn(List.of(otherActiveSession));
 
@@ -213,6 +219,7 @@ class AuthServiceTest {
         expiredToken.setRevoked(false);
 
         when(refreshTokenRepository.findByTokenHash(hash)).thenReturn(Optional.of(expiredToken));
+        when(refreshTokenRepository.consumeTokenAtomically(eq(expiredToken.getTokenId()), any(LocalDateTime.class))).thenReturn(0);
 
         RefreshTokenRequest req = new RefreshTokenRequest();
         req.setRefreshToken(rawToken);

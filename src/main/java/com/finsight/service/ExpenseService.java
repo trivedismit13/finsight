@@ -7,6 +7,7 @@ import com.finsight.exception.ResourceNotFoundException;
 import com.finsight.model.Expense;
 import com.finsight.model.ExpenseCategory;
 import com.finsight.model.ExpenseStatus;
+import com.finsight.model.Role;
 import com.finsight.model.User;
 import com.finsight.repository.ExpenseRepository;
 import com.finsight.repository.UserRepository;
@@ -77,11 +78,6 @@ public class ExpenseService {
         auditLogService.record(actorUserId, "CREATE_RECORD", "RECORD", record.getExpenseId(),
                 "Created record: amount=" + record.getAmount() + " category=" + record.getCategory());
 
-        // Budget check: always trigger for expenses
-        if (record.getCategory() != null && record.getExpenseDate() != null) {
-            String monthYear = record.getExpenseDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            budgetService.checkBudgetExceededAfterRecord(record.getCategory().name(), monthYear, actorUserId);
-        }
 
         return toResponse(record);
     }
@@ -94,8 +90,10 @@ public class ExpenseService {
             java.time.LocalDate startDate,
             java.time.LocalDate endDate,
             org.springframework.data.domain.Pageable pageable,
-            Long actorId,
-            boolean isAdmin) {
+            Long actorId) {
+
+        User actor = userRepository.findById(actorId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw new com.finsight.exception.InvalidRequestException("startDate cannot be after endDate");
@@ -118,7 +116,16 @@ public class ExpenseService {
             predicates.add(cb.isFalse(root.get("isDeleted")));
 
             // Mandatory cross-user ownership boundary
-            if (!isAdmin) {
+            if (actor.getRole() == Role.FINANCE_ADMIN) {
+                // COMPANY scope: Can see all records
+            } else if (actor.getRole() == Role.MANAGER) {
+                // TEAM scope: Can see own records AND records of users they manage
+                predicates.add(cb.or(
+                        cb.equal(root.get("createdBy").get("userId"), actorId),
+                        cb.equal(root.get("createdBy").get("manager").get("userId"), actorId)
+                ));
+            } else {
+                // EMPLOYEE scope: Can see only own records
                 predicates.add(cb.equal(root.get("createdBy").get("userId"), actorId));
             }
 
@@ -155,8 +162,8 @@ public class ExpenseService {
             throw new AccessDeniedException("Only the owner can update this expense.");
         }
 
-        if (record.getStatus() != ExpenseStatus.DRAFT) {
-            throw new IllegalStateException("Only DRAFT expenses can be updated.");
+        if (record.getStatus() != ExpenseStatus.DRAFT && record.getStatus() != ExpenseStatus.REJECTED) {
+            throw new IllegalStateException("Only DRAFT or REJECTED expenses can be updated.");
         }
 
         if (!record.getVersion().equals(req.getVersion())) {
@@ -208,8 +215,8 @@ public class ExpenseService {
             throw new AccessDeniedException("Only the owner can submit this expense.");
         }
 
-        if (record.getStatus() != ExpenseStatus.DRAFT) {
-            throw new IllegalStateException("Only DRAFT expenses can be submitted.");
+        if (record.getStatus() != ExpenseStatus.DRAFT && record.getStatus() != ExpenseStatus.REJECTED) {
+            throw new IllegalStateException("Only DRAFT or REJECTED expenses can be submitted.");
         }
 
         record.setStatus(ExpenseStatus.PENDING_APPROVAL);
@@ -246,6 +253,7 @@ public class ExpenseService {
                 .approvedAt(r.getApprovedAt())
                 .approvedByUserId(r.getApprovedBy() != null ? r.getApprovedBy().getUserId() : null)
                 .rejectedAt(r.getRejectedAt())
+                .rejectedByUserId(r.getRejectedBy() != null ? r.getRejectedBy().getUserId() : null)
                 .rejectionReason(r.getRejectionReason())
                 .build();
     }
@@ -304,6 +312,11 @@ public class ExpenseService {
                 "Your expense " + id + " has been approved."
         );
 
+        if (record.getCategory() != null && record.getExpenseDate() != null) {
+            String monthYear = record.getExpenseDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            budgetService.checkBudgetExceededAfterRecord(record.getCategory().name(), monthYear, managerId);
+        }
+
         return toResponse(record);
     }
 
@@ -318,8 +331,12 @@ public class ExpenseService {
             throw new IllegalStateException("Only PENDING_APPROVAL expenses can be rejected.");
         }
 
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
+
         record.setStatus(ExpenseStatus.REJECTED);
         record.setRejectedAt(LocalDateTime.now());
+        record.setRejectedBy(manager);
         record.setRejectionReason(reason);
         record = recordRepository.save(record);
 
@@ -336,7 +353,7 @@ public class ExpenseService {
     }
 
     @Transactional
-    @PreAuthorize("hasRole('FINANCE_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public ExpenseResponse processExpense(Long id, Long adminId) {
         Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
@@ -354,7 +371,7 @@ public class ExpenseService {
         notificationDispatcherService.enqueueNotification(
                 record.getCreatedBy().getUserId(),
                 "EXPENSE_PROCESSED",
-                "Your expense " + id + " has been processed and reimbursed."
+                "Your expense " + id + " has been processed."
         );
 
         return toResponse(record);

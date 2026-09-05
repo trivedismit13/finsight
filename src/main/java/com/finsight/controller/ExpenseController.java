@@ -49,9 +49,7 @@ public class ExpenseController {
         }
 
         Long actorId = resolveUserId(principal);
-        boolean isAdmin = principal.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_FINANCE_ADMIN"));
-
-        return ResponseEntity.ok(new ApiResponse<>("Records fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId, isAdmin)));
+        return ResponseEntity.ok(new ApiResponse<>("Records fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId)));
     }
 
     @PostMapping
@@ -134,9 +132,7 @@ public class ExpenseController {
         }
 
         Long actorId = resolveUserId(principal);
-        // Ensure they have FINANCE_ADMIN or ADMIN role. Handled by Service's PreAuthorize implicitly if passed through
-        // but we'll let service handle security. The boolean flag forces admin mode fetch.
-        return ResponseEntity.ok(new ApiResponse<>("All expenses fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId, true)));
+        return ResponseEntity.ok(new ApiResponse<>("All expenses fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId)));
     }
 
     @PostMapping("/admin/{id}/process")

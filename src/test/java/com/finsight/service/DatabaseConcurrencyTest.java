@@ -199,12 +199,13 @@ public class DatabaseConcurrencyTest {
         budget.setAlertSent(false);
         budgetRepository.save(budget);
 
-        // Pre-fill to 90
+        // Pre-fill to 150 (exceeds budget of 100)
         Expense r1 = new Expense();
         r1.setCreatedBy(testUser);
-        r1.setAmount(new BigDecimal("90.00"));
+        r1.setAmount(new BigDecimal("150.00"));
         r1.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         r1.setExpenseDate(LocalDate.of(2026, 8, 10));
+        r1.setStatus(com.finsight.model.ExpenseStatus.APPROVED);
         recordRepository.save(r1);
 
         int threadCount = 2;
@@ -218,11 +219,9 @@ public class DatabaseConcurrencyTest {
                 try {
                     org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
                     latch.await();
-                    com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
-                    req.setAmount(new BigDecimal("20.00"));
-                    req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
-                    req.setExpenseDate(LocalDate.of(2026, 8, 11));
-                    recordService.createExpense(req, testUser.getUserId());
+                    transactionTemplate.executeWithoutResult(status -> {
+                        budgetService.checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory.MEALS.name(), "2026-08", testUser.getUserId());
+                    });
                 } catch (Exception e) {
                     e.printStackTrace();
                 } finally {

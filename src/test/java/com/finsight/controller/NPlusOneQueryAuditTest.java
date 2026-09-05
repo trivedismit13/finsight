@@ -72,7 +72,7 @@ class NPlusOneQueryAuditTest {
             u.setName("User " + i);
             u.setEmail("user" + i + "@example.com");
             u.setPassword("hashedpassword" + i);
-            u.setRole(Role.EMPLOYEE);
+            u.setRole(i == 1 ? Role.FINANCE_ADMIN : Role.EMPLOYEE);
             u = userRepository.save(u);
 
             for (int j = 1; j <= 10; j++) {

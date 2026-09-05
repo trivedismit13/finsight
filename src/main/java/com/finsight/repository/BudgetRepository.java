@@ -12,8 +12,7 @@ import java.util.Optional;
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
     Optional<Budget> findByCategoryAndMonthYear(String category, String monthYear);
 
-    @Query("SELECT c FROM Budget c WHERE c.createdBy.userId = :userId OR :isAdmin = true")
-    java.util.List<Budget> findByUser(@Param("userId") Long userId, @Param("isAdmin") boolean isAdmin, org.springframework.data.domain.Sort sort);
+
 
     @Modifying
     @Query("UPDATE Budget c SET c.isAlertSent = true WHERE c.budgetId = :id AND c.isAlertSent = false")

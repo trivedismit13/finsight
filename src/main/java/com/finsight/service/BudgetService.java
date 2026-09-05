@@ -22,7 +22,7 @@ public class BudgetService {
     private final NotificationDispatcherService notificationDispatcherService;
 
     @Transactional
-    @PreAuthorize("hasRole('FINANCE_ADMIN') or hasRole('ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public Budget createOrUpdateBudget(Long adminId, String category, String monthYear, BigDecimal limit) {
         User admin = userRepository.findById(adminId).orElseThrow();
         Budget budget = budgetRepository.findByCategoryAndMonthYear(category, monthYear)

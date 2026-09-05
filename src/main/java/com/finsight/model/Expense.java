@@ -55,6 +55,10 @@ public class Expense {
     @JoinColumn(name = "approved_by")
     private User approvedBy;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rejected_by")
+    private User rejectedBy;
+
     @Column(name = "rejected_at")
     private LocalDateTime rejectedAt;
 

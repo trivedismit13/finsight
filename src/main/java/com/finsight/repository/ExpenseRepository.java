@@ -29,7 +29,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
      */
     @Query("SELECT COALESCE(SUM(r.amount), 0) FROM Expense r " +
            "WHERE r.category = :category " +
-           "AND r.status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PROCESSED') " +
+           "AND r.status IN ('APPROVED', 'PROCESSED') " +
            "AND r.isDeleted = false " +
            "AND r.expenseDate >= :startDate AND r.expenseDate < :endDateExclusive")
     BigDecimal sumExpensesByCategoryAndDateRange(@Param("category") com.finsight.model.ExpenseCategory category,
@@ -45,4 +45,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
 
     @Query("SELECT r FROM Expense r WHERE r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate < :endDateExclusive")
     org.springframework.data.domain.Slice<Expense> findByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDateExclusive") java.time.LocalDate endDateExclusive, org.springframework.data.domain.Pageable pageable);
+
+    @Query("SELECT r FROM Expense r WHERE (r.createdBy.userId = :userId OR r.createdBy.manager.userId = :userId) AND r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate < :endDateExclusive")
+    org.springframework.data.domain.Slice<Expense> findTeamByDateRange(@Param("userId") Long userId, @Param("startDate") java.time.LocalDate startDate, @Param("endDateExclusive") java.time.LocalDate endDateExclusive, org.springframework.data.domain.Pageable pageable);
 }

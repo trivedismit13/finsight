@@ -26,6 +26,7 @@ public class ExpenseResponse {
     private LocalDateTime submittedAt;
     private LocalDateTime approvedAt;
     private Long approvedByUserId;
+    private Long rejectedByUserId;
     private LocalDateTime rejectedAt;
     private String rejectionReason;
 }

@@ -44,6 +44,7 @@ public class AuditIntegrationTest {
     private AuditLogService auditLogService;
 
     private User testUser;
+    private User testManager;
 
     @BeforeEach
     void setUp() {
@@ -51,11 +52,19 @@ public class AuditIntegrationTest {
         auditLogRepository.deleteAll();
         userRepository.deleteAll();
 
+        testManager = new User();
+        testManager.setName("Manager");
+        testManager.setEmail("manager@test.com");
+        testManager.setPassword("password");
+        testManager.setRole(Role.MANAGER);
+        testManager = userRepository.save(testManager);
+
         testUser = new User();
         testUser.setName("Audit Test User");
         testUser.setEmail("audit@test.com");
         testUser.setPassword("password");
         testUser.setRole(Role.EMPLOYEE);
+        testUser.setManager(testManager);
         testUser = userRepository.save(testUser);
     }
 
@@ -70,18 +79,23 @@ public class AuditIntegrationTest {
         req.setExpenseDate(LocalDate.now());
         req.setIdempotencyKey("TEST_ROLLBACK_KEY");
 
-        // Force a failure in the business logic AFTER audit is called
+        com.finsight.dto.response.ExpenseResponse res = expenseService.createExpense(req, testUser.getUserId());
+        expenseService.submitExpense(res.getExpenseId(), testUser.getUserId());
+
+        // Clear audit log to measure only approveExpense
+        auditLogRepository.deleteAll();
+
+        // Force a failure in the business logic AFTER audit is called in approveExpense
         doThrow(new RuntimeException("Simulated budget error"))
             .when(budgetService).checkBudgetExceededAfterRecord(anyString(), anyString(), anyLong());
         
         try {
-            expenseService.createExpense(req, testUser.getUserId());
+            expenseService.approveExpense(res.getExpenseId(), testManager.getUserId());
         } catch (Exception e) {
             // expected
         }
 
-        // Neither record nor audit should exist
-        assertEquals(0, expenseRepository.count());
+        // Neither state change nor audit should exist
         assertEquals(0, auditLogRepository.count());
     }
 

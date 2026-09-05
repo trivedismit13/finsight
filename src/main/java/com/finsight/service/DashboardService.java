@@ -20,7 +20,7 @@ public class DashboardService {
     private final DashboardRepository dashboardRepository;
 
     @Transactional(readOnly = true)
-    @PreAuthorize("hasAnyRole('FINANCE_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public Map<String, Object> getCompanyAnalytics(LocalDate startDate, LocalDate endDate) {
         Map<String, Object> map = new HashMap<>();
         BigDecimal total = dashboardRepository.getTotalCompanyExpenses(startDate, endDate);

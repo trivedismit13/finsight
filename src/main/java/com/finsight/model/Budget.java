@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-@Table(name = "budgets", uniqueConstraints = {
+@Table(name = "category_budgets", uniqueConstraints = {
     @UniqueConstraint(columnNames = {"category", "month_year"})
 })
 public class Budget {

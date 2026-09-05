@@ -98,14 +98,14 @@ class CrossUserAuthorizationTest {
 
     @Test
     void testUserACannotSeeUserBRecords() {
-        var page = expenseService.getAllExpenses(null, null, null, null, PageRequest.of(0, 10, Sort.unsorted()), userA.getUserId(), false);
+        var page = expenseService.getAllExpenses(null, null, null, null, PageRequest.of(0, 10, Sort.unsorted()), userA.getUserId());
         assertEquals(2, page.getTotalElements());
         assertTrue(page.getContent().stream().allMatch(r -> r.getCategory().equals("TRAVEL") || r.getCategory().equals("OFFICE_SUPPLIES")));
     }
 
     @Test
     void testUserBCannotSeeUserARecords() {
-        var page = expenseService.getAllExpenses(null, null, null, null, PageRequest.of(0, 10, Sort.unsorted()), userB.getUserId(), false);
+        var page = expenseService.getAllExpenses(null, null, null, null, PageRequest.of(0, 10, Sort.unsorted()), userB.getUserId());
         assertEquals(2, page.getTotalElements());
         assertTrue(page.getContent().stream().allMatch(r -> r.getCategory().equals("TRAVEL") || r.getCategory().equals("MEALS")));
         assertTrue(page.getContent().stream().anyMatch(r -> r.getAmount().compareTo(new BigDecimal("500.00")) == 0));
@@ -113,7 +113,7 @@ class CrossUserAuthorizationTest {
 
     @Test
     void testAdminCanSeeBothRecords() {
-        var page = expenseService.getAllExpenses(null, null, null, null, PageRequest.of(0, 10, Sort.unsorted()), admin.getUserId(), true);
+        var page = expenseService.getAllExpenses(null, null, null, null, PageRequest.of(0, 10, Sort.unsorted()), admin.getUserId());
         assertEquals(4, page.getTotalElements(), "Admin should see all records across the system");
     }
 
@@ -125,11 +125,11 @@ class CrossUserAuthorizationTest {
 
     @Test
     void testExpensesOwnershipWithPart34Filters() {
-        var page = expenseService.getAllExpenses("DRAFT", "TRAVEL", null, null, PageRequest.of(0, 10, Sort.unsorted()), userA.getUserId(), false);
+        var page = expenseService.getAllExpenses("DRAFT", "TRAVEL", null, null, PageRequest.of(0, 10, Sort.unsorted()), userA.getUserId());
         assertEquals(1, page.getTotalElements());
         assertEquals(new BigDecimal("100.50"), page.getContent().get(0).getAmount());
 
-        var pageB = expenseService.getAllExpenses("DRAFT", "MEALS", null, null, PageRequest.of(0, 10, Sort.unsorted()), userB.getUserId(), false);
+        var pageB = expenseService.getAllExpenses("DRAFT", "MEALS", null, null, PageRequest.of(0, 10, Sort.unsorted()), userB.getUserId());
         assertEquals(1, pageB.getTotalElements());
         assertEquals(new BigDecimal("200.00"), pageB.getContent().get(0).getAmount());
     }

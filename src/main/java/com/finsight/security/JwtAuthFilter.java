@@ -41,6 +41,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             String email = jwtUtil.extractEmail(token);
             if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                if (!userDetails.isEnabled()) {
+                    throw new org.springframework.security.authentication.DisabledException("User is disabled");
+                }
+                if (!userDetails.isAccountNonLocked()) {
+                    throw new org.springframework.security.authentication.LockedException("User account is locked");
+                }
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities()
                 );

@@ -19,7 +19,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
 
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public List<UserResponse> getAllUsers() {
         return userRepository.findAll().stream()
                 .map(this::toResponse)
@@ -27,7 +27,7 @@ public class UserService {
     }
 
     @Transactional
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public UserResponse updateRoleAndStatus(Long userId, Role role, boolean isActive, Long actorUserId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));

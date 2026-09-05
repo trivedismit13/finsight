@@ -79,7 +79,7 @@ public class ReportFailureInjectionTest {
             fileExistedDuringWrite.set(true); // Since flush succeeded, the file is physically on disk
             
             throw new IOException("Simulated disk full");
-        }).when(reportExportService).fetchAndWriteReportChunk(anyBoolean(), anyLong(), any(), any(), any(), any());
+        }).when(reportExportService).fetchAndWriteReportChunk(any(), anyLong(), any(), any(), any(), any());
 
         // Trigger job creation
         Long jobId = reportExportService.requestReport(testUser.getUserId(), "2026-08");

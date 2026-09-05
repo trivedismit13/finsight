@@ -36,10 +36,10 @@ public class ExpenseService {
     @org.springframework.beans.factory.annotation.Autowired
     private ExpenseService self;
 
-    public ExpenseResponse createExpense(CreateExpenseRequest req, Long actorUserId) {
+    public ExpenseResponse createExpense(CreateExpenseRequest req, String idempotencyKey, Long actorUserId) {
         // Idempotency: if the key already exists, return the existing record (200 OK at controller level)
-        if (req.getIdempotencyKey() != null) {
-            var existingOpt = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, req.getIdempotencyKey());
+        if (idempotencyKey != null) {
+            var existingOpt = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, idempotencyKey);
             if (existingOpt.isPresent()) {
                 Expense existing = existingOpt.get();
                 verifyIdempotencyPayloadMatch(existing, req);
@@ -48,10 +48,10 @@ public class ExpenseService {
         }
 
         try {
-            return self.doCreateExpense(req, actorUserId);
+            return self.doCreateExpense(req, idempotencyKey, actorUserId);
         } catch (DataIntegrityViolationException e) {
             // Concurrent duplicate idempotency key — race condition between the check and the insert
-            Expense existing = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, req.getIdempotencyKey())
+            Expense existing = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, idempotencyKey)
                     .orElseThrow(() -> new RuntimeException("Record creation failed unexpectedly"));
             verifyIdempotencyPayloadMatch(existing, req);
             return toResponse(existing);
@@ -59,17 +59,17 @@ public class ExpenseService {
     }
 
     @Transactional
-    public ExpenseResponse doCreateExpense(CreateExpenseRequest req, Long actorUserId) {
+    public ExpenseResponse doCreateExpense(CreateExpenseRequest req, String idempotencyKey, Long actorUserId) {
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Actor user not found"));
 
         Expense record = new Expense();
         record.setCreatedBy(actor);
         record.setAmount(req.getAmount());
-        record.setCategory(ExpenseCategory.valueOf(req.getCategory()));
+        record.setCategory(req.getCategory());
         record.setExpenseDate(req.getExpenseDate());
         record.setDescription(req.getDescription());
-        record.setIdempotencyKey(req.getIdempotencyKey());
+        record.setIdempotencyKey(idempotencyKey);
         record.setStatus(ExpenseStatus.DRAFT);
 
         record = recordRepository.saveAndFlush(record);
@@ -174,7 +174,7 @@ public class ExpenseService {
         String oldState = record.getAmount() + "|" + record.getCategory();
 
         record.setAmount(req.getAmount());
-        record.setCategory(ExpenseCategory.valueOf(req.getCategory()));
+        record.setCategory(req.getCategory());
         record.setExpenseDate(req.getExpenseDate());
         record.setDescription(req.getDescription());
 
@@ -264,7 +264,7 @@ public class ExpenseService {
         if (existing.getAmount().compareTo(req.getAmount()) != 0) {
             throw new IllegalArgumentException("Idempotency key already used with a different amount: " + existing.getAmount() + " vs " + req.getAmount());
         }
-        if (!existing.getCategory().name().equals(req.getCategory())) {
+        if (!existing.getCategory().equals(req.getCategory())) {
             throw new IllegalArgumentException("Idempotency key already used with a different category: " + existing.getCategory() + " vs " + req.getCategory());
         }
         if (!existing.getExpenseDate().equals(req.getExpenseDate())) {

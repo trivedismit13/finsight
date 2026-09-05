@@ -36,7 +36,7 @@ public class ValidationIntegrationTest {
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("-500.00")); // negative amount
         // invalid enum
-        req.setCategory(""); // blank category
+        req.setCategory(null); // blank category
         req.setExpenseDate(null); // missing date
 
         mockMvc.perform(post("/api/expenses")
@@ -46,7 +46,7 @@ public class ValidationIntegrationTest {
                 
         // Too many decimals
         req.setAmount(new BigDecimal("10.123"));
-        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         req.setExpenseDate(LocalDate.now());
         
         mockMvc.perform(post("/api/expenses")

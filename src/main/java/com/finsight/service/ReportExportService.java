@@ -147,19 +147,19 @@ public class ReportExportService {
             java.time.LocalDate endDateExclusive = ym.plusMonths(1).atDay(1);
 
             try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
-                writer.write("Record ID,Date,Type,Category,Amount,Description\n");
+                writer.write("Expense ID,Date,Status,Category,Amount,Currency,Description\n");
 
                 org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(
                         0, 500, org.springframework.data.domain.Sort.by("expenseDate", "expenseId").ascending());
                 org.springframework.data.domain.Slice<Expense> slice;
 
                 do {
-                    slice = self.fetchAndWriteReportChunk(userRole, requestedBy.getUserId(), startDate, endDateExclusive, pageable, writer);
+                    slice = self.fetchAndWriteReportChunk(startDate, endDateExclusive, pageable, writer);
                     pageable = slice.nextPageable();
                 } while (slice.hasNext());
             }
 
-            int updated = self.updateJobState(jobId, "COMPLETED", LocalDateTime.now(), filename);
+            int updated = self.updateJobState(jobId, "COMPLETED", LocalDateTime.now(), filename, null);
             if (updated > 0) {
                 log.info("Report job {} completed", jobId);
                 reportSuccessCounter.increment();
@@ -188,27 +188,21 @@ public class ReportExportService {
         }
     }
 
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    @org.springframework.transaction.annotation.Transactional(readOnly = true, propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public org.springframework.data.domain.Slice<Expense> fetchAndWriteReportChunk(
-            Role userRole, Long userId, java.time.LocalDate startDate, java.time.LocalDate endDateExclusive,
-            org.springframework.data.domain.Pageable pageable, BufferedWriter writer) throws java.io.IOException {
-            
-        org.springframework.data.domain.Slice<Expense> slice;
-        if (userRole == Role.FINANCE_ADMIN) {
-            slice = expenseRepository.findByDateRange(startDate, endDateExclusive, pageable);
-        } else if (userRole == Role.MANAGER) {
-            slice = expenseRepository.findTeamByDateRange(userId, startDate, endDateExclusive, pageable);
-        } else {
-            slice = expenseRepository.findByUserAndDateRange(userId, startDate, endDateExclusive, pageable);
-        }
+            java.time.LocalDate startDate, java.time.LocalDate endDateExclusive,
+            org.springframework.data.domain.Pageable pageable, java.io.Writer writer) throws java.io.IOException {
+
+        org.springframework.data.domain.Slice<Expense> slice = expenseRepository.findAllByDateRange(startDate, endDateExclusive, pageable);
 
         for (Expense record : slice.getContent()) {
-            writer.write(String.format("%s,%s,%s,%s,%s,%s\n",
+            writer.write(String.format("%s,%s,%s,%s,%s,%s,%s\n",
                     escapeCsv(String.valueOf(record.getExpenseId())),
                     escapeCsv(record.getExpenseDate().toString()),
                     escapeCsv(record.getStatus().name()),
                     escapeCsvAndPreventInjection(record.getCategory().name()),
                     escapeCsv(record.getAmount().toPlainString()),
+                    escapeCsv(record.getCurrency()),
                     escapeCsvAndPreventInjection(record.getDescription())
             ));
         }
@@ -221,8 +215,8 @@ public class ReportExportService {
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public int updateJobState(Long jobId, String status, LocalDateTime completedAt, String filePath) {
-        return reportJobRepository.updateJobState(jobId, status, completedAt, filePath);
+    public int updateJobState(Long jobId, String status, LocalDateTime completedAt, String filePath, String failureReason) {
+        return reportJobRepository.updateJobState(jobId, status, completedAt, filePath, failureReason);
     }
 
     private String escapeCsvAndPreventInjection(String value) {
@@ -247,7 +241,7 @@ public class ReportExportService {
 
     private void markFailed(ReportJob job, Long jobId, String reason) {
         try {
-            int updated = self.updateJobState(jobId, "FAILED", LocalDateTime.now(), null);
+            int updated = self.updateJobState(jobId, "FAILED", LocalDateTime.now(), null, reason);
             if (updated == 0) {
                 log.warn("Stale worker attempted to mark report job {} as FAILED", jobId);
             } else {

@@ -75,11 +75,9 @@ public class AuditIntegrationTest {
     void testAuditRollback_whenBusinessTransactionFails() {
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("100.00"));
-        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         req.setExpenseDate(LocalDate.now());
-        req.setIdempotencyKey("TEST_ROLLBACK_KEY");
-
-        com.finsight.dto.response.ExpenseResponse res = expenseService.createExpense(req, testUser.getUserId());
+                com.finsight.dto.response.ExpenseResponse res = expenseService.createExpense(req, "TEST_KEY", testUser.getUserId());
         expenseService.submitExpense(res.getExpenseId(), testUser.getUserId());
 
         // Clear audit log to measure only approveExpense
@@ -103,16 +101,14 @@ public class AuditIntegrationTest {
     void testAuditFailure_preventsBusinessTransactionCommit() {
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("200.00"));
-        req.setCategory(com.finsight.model.ExpenseCategory.TRAVEL.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
         req.setExpenseDate(LocalDate.now());
-        req.setIdempotencyKey("TEST_AUDIT_FAIL_KEY");
-
-        // Force audit service to throw an exception
+                // Force audit service to throw an exception
         doThrow(new RuntimeException("Audit DB Down")).when(auditLogService)
                 .record(any(), anyString(), anyString(), any(), anyString());
 
         try {
-            expenseService.createExpense(req, testUser.getUserId());
+            expenseService.createExpense(req, "TEST_KEY", testUser.getUserId());
         } catch (Exception e) {
             // expected RuntimeException
         }

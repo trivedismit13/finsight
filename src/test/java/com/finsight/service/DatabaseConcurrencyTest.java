@@ -408,11 +408,11 @@ public class DatabaseConcurrencyTest {
         Long jobId = job.getJobId();
         
         // Simulating worker 1 finishing and marking it COMPLETED
-        int updated = reportExportService.updateJobState(jobId, "COMPLETED", LocalDateTime.now(), "file1.csv");
+        int updated = reportExportService.updateJobState(jobId, "COMPLETED", LocalDateTime.now(), "file1.csv", null);
         assertEquals(1, updated);
         
         // Simulating worker 2 (stale) waking up and trying to mark it FAILED
-        int updatedStale = reportExportService.updateJobState(jobId, "FAILED", LocalDateTime.now(), null);
+        int updatedStale = reportExportService.updateJobState(jobId, "FAILED", LocalDateTime.now(), null, "Some reason");
         assertEquals(0, updatedStale, "Stale worker should not be able to update a job that is no longer PROCESSING");
         
         ReportJob dbJob = reportJobRepository.findById(jobId).orElseThrow();
@@ -440,11 +440,9 @@ public class DatabaseConcurrencyTest {
                     latch.await();
                     com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
                     req.setAmount(new BigDecimal("150.00"));
-                    req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+                    req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
                     req.setExpenseDate(LocalDate.of(2026, 8, 18));
-                    req.setIdempotencyKey(idempotencyKey);
-                    
-                    com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, testUser.getUserId());
+                                        com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, idempotencyKey, testUser.getUserId());
                     if (res != null && res.getExpenseId() != null) {
                         successfulResponses.incrementAndGet();
                     }

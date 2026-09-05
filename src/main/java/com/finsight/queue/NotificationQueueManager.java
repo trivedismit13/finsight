@@ -211,4 +211,30 @@ public class NotificationQueueManager {
     }
 
 
+    @Transactional
+    public void retryDeadLetter(Long id) {
+        Notification n = notificationRepository.findById(id).orElseThrow();
+        if ("DEAD_LETTER".equals(n.getStatus())) {
+            n.setStatus("PENDING");
+            n.setRetryCount(0);
+            n.setDeadLetterReason(null);
+            notificationRepository.save(n);
+            enqueue(n.getNotificationId());
+        }
+    }
+
+    @Transactional
+    public int retryAllDeadLetters() {
+        List<Notification> deadLetters = notificationRepository.findByStatus("DEAD_LETTER");
+        int count = 0;
+        for (Notification n : deadLetters) {
+            n.setStatus("PENDING");
+            n.setRetryCount(0);
+            n.setDeadLetterReason(null);
+            notificationRepository.save(n);
+            enqueue(n.getNotificationId());
+            count++;
+        }
+        return count;
+    }
 }

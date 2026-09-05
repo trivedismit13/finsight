@@ -16,14 +16,13 @@ public class CreateExpenseRequest {
     private BigDecimal amount;
 
 
-    @NotBlank
-    private String category;
+    @NotNull
+    private com.finsight.model.ExpenseCategory category;
 
     @NotNull
     private LocalDate expenseDate;
 
     private String description;
-
-    // Optional: if provided, guarantees exactly-once semantics on duplicate submissions
-    private String idempotencyKey;
 }
+
+

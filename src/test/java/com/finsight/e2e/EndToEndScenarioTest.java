@@ -107,12 +107,11 @@ public class EndToEndScenarioTest {
         // --- Step 4: Admin creates records with idempotency key ---
         CreateExpenseRequest createReq = new CreateExpenseRequest();
         createReq.setAmount(new BigDecimal("100000.00"));
-        createReq.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        createReq.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         createReq.setExpenseDate(LocalDate.now());
-        createReq.setIdempotencyKey("idem-key-1");
-        
-        MvcResult res1 = mockMvc.perform(post("/api/expenses")
+                MvcResult res1 = mockMvc.perform(post("/api/expenses")
                 .header("Authorization", "Bearer " + financeAdminToken)
+                .header("Idempotency-Key", "idem-key-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createReq)))
                 .andExpect(status().isCreated())
@@ -123,11 +122,10 @@ public class EndToEndScenarioTest {
         assertNotNull(record1.get("expenseId"));
 
         createReq.setAmount(new BigDecimal("5000.00"));
-        createReq.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
-        createReq.setIdempotencyKey("idem-key-2");
-
-        MvcResult res2 = mockMvc.perform(post("/api/expenses")
+        createReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+                MvcResult res2 = mockMvc.perform(post("/api/expenses")
                 .header("Authorization", "Bearer " + financeAdminToken)
+                .header("Idempotency-Key", "idem-key-2")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createReq)))
                 .andExpect(status().isCreated())
@@ -140,6 +138,7 @@ public class EndToEndScenarioTest {
         // --- Step 5: Repeat exact request ---
         MvcResult res2Repeat = mockMvc.perform(post("/api/expenses")
                 .header("Authorization", "Bearer " + financeAdminToken)
+                .header("Idempotency-Key", "idem-key-2")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createReq)))
                 .andExpect(status().isCreated()) // Changed back to isCreated() because ExpenseController always returns 201
@@ -154,10 +153,9 @@ public class EndToEndScenarioTest {
 
         // --- Step 6: Repeat using same key but different payload ---
         createReq.setAmount(new BigDecimal("6000.00")); // Different amount
-        createReq.setIdempotencyKey("idem-key-2");
-        
-        mockMvc.perform(post("/api/expenses")
+                mockMvc.perform(post("/api/expenses")
                 .header("Authorization", "Bearer " + financeAdminToken)
+                .header("Idempotency-Key", "idem-key-2")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createReq)))
                 .andExpect(status().isConflict()); // 409 Conflict for different payload
@@ -180,12 +178,11 @@ public class EndToEndScenarioTest {
         // Cross the threshold
         CreateExpenseRequest crossBudgetReq = new CreateExpenseRequest();
         crossBudgetReq.setAmount(new BigDecimal("150.00"));
-        crossBudgetReq.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        crossBudgetReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         crossBudgetReq.setExpenseDate(LocalDate.now());
-        crossBudgetReq.setIdempotencyKey("budget-key-1");
-        
-        mockMvc.perform(post("/api/expenses")
+                mockMvc.perform(post("/api/expenses")
                 .header("Authorization", "Bearer " + financeAdminToken)
+                .header("Idempotency-Key", "budget-key-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(crossBudgetReq)))
                 .andExpect(status().isCreated());
@@ -268,11 +265,9 @@ public class EndToEndScenarioTest {
                     latch.await();
                     CreateExpenseRequest concReq = new CreateExpenseRequest();
                     concReq.setAmount(new BigDecimal("500.00"));
-                    concReq.setCategory(com.finsight.model.ExpenseCategory.TRAVEL.name());
+                    concReq.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
                     concReq.setExpenseDate(LocalDate.now());
-                    concReq.setIdempotencyKey("concurrent-idem-key");
-                    
-                    MvcResult res = mockMvc.perform(post("/api/expenses")
+                                        MvcResult res = mockMvc.perform(post("/api/expenses")
                             .header("Authorization", "Bearer " + financeAdminToken)
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(concReq)))

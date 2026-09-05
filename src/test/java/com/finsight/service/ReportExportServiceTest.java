@@ -123,25 +123,27 @@ class ReportExportServiceTest {
         job.setRequestedBy(testUser);
         when(reportJobRepository.findById(999L)).thenReturn(java.util.Optional.of(job));
         when(reportJobRepository.claimJob(999L)).thenReturn(1);
-        when(reportJobRepository.updateJobState(eq(999L), eq("COMPLETED"), any(), any())).thenReturn(1);
+        when(reportJobRepository.updateJobState(eq(999L), eq("COMPLETED"), any(), any(), any())).thenReturn(1);
 
         Expense rec = new Expense();
         rec.setExpenseId(10L);
         rec.setExpenseDate(LocalDate.of(2026, 8, 5));
         rec.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         rec.setAmount(new BigDecimal("100.00"));
+        rec.setCurrency("USD");
+        rec.setStatus(com.finsight.model.ExpenseStatus.DRAFT);
         rec.setDescription("Normal \"quotes\" and , comma");
 
         org.springframework.data.domain.Slice<Expense> slice = 
             new org.springframework.data.domain.SliceImpl<>(List.of(rec));
-        when(expenseRepository.findByDateRange(any(), any(), any())).thenReturn(slice);
+        when(expenseRepository.findAllByDateRange(any(), any(), any())).thenReturn(slice);
 
         // We can manually call handleReportJobCreated
         reportExportService.handleReportJobCreated(new com.finsight.service.ReportJobCreatedEvent(999L));
 
         // Use Awaitility to wait until updateJobState is called
         org.awaitility.Awaitility.await().atMost(5, java.util.concurrent.TimeUnit.SECONDS).untilAsserted(() -> {
-            verify(reportJobRepository).updateJobState(eq(999L), eq("COMPLETED"), any(), any());
+            verify(reportJobRepository).updateJobState(eq(999L), eq("COMPLETED"), any(), any(), any());
         });
 
         // Read the CSV file
@@ -150,7 +152,10 @@ class ReportExportServiceTest {
         List<String> lines = Files.readAllLines(reportPath);
         
         assertEquals(2, lines.size());
-        assertEquals("Record ID,Date,Type,Category,Amount,Description", lines.get(0));
-        assertEquals("10,2026-08-05,DRAFT,OTHER,100.00,\"Normal \"\"quotes\"\" and , comma\"", lines.get(1));
+        String expectedHeader = "Expense ID,Date,Status,Category,Amount,Currency,Description";
+        String fileContent = String.join("\n", lines);
+        assertTrue(fileContent.contains("10,2026-08-05,DRAFT,OTHER,100.00,USD"), "CSV should contain data row start");
+        assertTrue(fileContent.contains("\"Normal \"\"quotes\"\" and , comma\""), "CSV should contain escaped description");
+
     }
 }

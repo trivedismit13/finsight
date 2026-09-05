@@ -79,10 +79,10 @@ class TransactionBoundaryAuditTest {
     void testAuditSuccess() {
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("50.00"));
-        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.now());
 
-        var response = expenseService.createExpense(req, testUser.getUserId());
+        var response = expenseService.createExpense(req, "TEST_KEY", testUser.getUserId());
 
         assertTrue(recordRepository.findById(response.getExpenseId()).isPresent(), "Record must be saved");
         assertTrue(auditLogRepository.findAll().stream()
@@ -97,11 +97,11 @@ class TransactionBoundaryAuditTest {
 
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("99.00"));
-        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.now());
 
         assertThrows(RuntimeException.class, () -> {
-            expenseService.createExpense(req, testUser.getUserId());
+            expenseService.createExpense(req, "TEST_KEY", testUser.getUserId());
         });
 
         // Verify the record was rolled back

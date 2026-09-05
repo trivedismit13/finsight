@@ -69,11 +69,11 @@ class ServiceSecurityTest {
     void testNoUserThrowsResourceNotFoundException() {
         CreateExpenseRequest req = new CreateExpenseRequest();
         req.setAmount(new BigDecimal("100"));
-        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         req.setExpenseDate(LocalDate.now());
 
         assertThrows(com.finsight.exception.ResourceNotFoundException.class, () -> {
-            recordService.createExpense(req, 1L);
+            recordService.createExpense(req, "TEST_KEY", 1L);
         });
     }
 }

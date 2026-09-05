@@ -44,7 +44,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
     org.springframework.data.domain.Slice<Expense> findByUserAndDateRange(@Param("userId") Long userId, @Param("startDate") java.time.LocalDate startDate, @Param("endDateExclusive") java.time.LocalDate endDateExclusive, org.springframework.data.domain.Pageable pageable);
 
     @Query("SELECT r FROM Expense r WHERE r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate < :endDateExclusive")
-    org.springframework.data.domain.Slice<Expense> findByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDateExclusive") java.time.LocalDate endDateExclusive, org.springframework.data.domain.Pageable pageable);
+    org.springframework.data.domain.Slice<Expense> findAllByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDateExclusive") java.time.LocalDate endDateExclusive, org.springframework.data.domain.Pageable pageable);
 
     @Query("SELECT r FROM Expense r WHERE (r.createdBy.userId = :userId OR r.createdBy.manager.userId = :userId) AND r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate < :endDateExclusive")
     org.springframework.data.domain.Slice<Expense> findTeamByDateRange(@Param("userId") Long userId, @Param("startDate") java.time.LocalDate startDate, @Param("endDateExclusive") java.time.LocalDate endDateExclusive, org.springframework.data.domain.Pageable pageable);

@@ -85,16 +85,14 @@ public class ExpenseServiceTest {
         Expense existing = new Expense();
         existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         existing.setExpenseId(99L);
-        existing.setIdempotencyKey(key);
-        existing.setCreatedBy(testUser);
+                existing.setCreatedBy(testUser);
         existing.setAmount(BigDecimal.valueOf(100));
         existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         existing.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         CreateExpenseRequest req = new CreateExpenseRequest();
-        req.setIdempotencyKey(key);
-        req.setAmount(BigDecimal.valueOf(100));
-        req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+                req.setAmount(BigDecimal.valueOf(100));
+        req.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
@@ -104,7 +102,7 @@ public class ExpenseServiceTest {
                 .thenReturn(Optional.of(existing)); // after DataIntegrityViolationException
         when(recordRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        ExpenseResponse result = recordService.createExpense(req, 1L);
+        ExpenseResponse result = recordService.createExpense(req, key, 1L);
 
         assertEquals(99L, result.getExpenseId());
         // Only one save attempt was made
@@ -132,7 +130,7 @@ public class ExpenseServiceTest {
         UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(2L); // matches DB version
         req.setAmount(BigDecimal.valueOf(200));
-        req.setCategory(com.finsight.model.ExpenseCategory.TRANSPORT.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.TRANSPORT);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         ExpenseResponse result = recordService.updateExpense(5L, req, 1L);
@@ -163,22 +161,20 @@ public class ExpenseServiceTest {
         Expense existing = new Expense();
         existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         existing.setExpenseId(100L);
-        existing.setIdempotencyKey(key);
-        existing.setCreatedBy(testUser);
+                existing.setCreatedBy(testUser);
         existing.setAmount(BigDecimal.valueOf(50));
         existing.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         existing.setExpenseDate(LocalDate.of(2026, 8, 18));
         
         CreateExpenseRequest req = new CreateExpenseRequest();
-        req.setIdempotencyKey(key);
-        req.setAmount(BigDecimal.valueOf(50));
-        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+                req.setAmount(BigDecimal.valueOf(50));
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        ExpenseResponse result = recordService.createExpense(req, 1L);
+        ExpenseResponse result = recordService.createExpense(req, key, 1L);
 
         assertEquals(100L, result.getExpenseId());
         verify(recordRepository, never()).saveAndFlush(any());
@@ -190,22 +186,20 @@ public class ExpenseServiceTest {
         Expense existing = new Expense();
         existing.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         existing.setExpenseId(100L);
-        existing.setIdempotencyKey(key);
-        existing.setCreatedBy(testUser);
+                existing.setCreatedBy(testUser);
         existing.setAmount(BigDecimal.valueOf(50));
         existing.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         existing.setExpenseDate(LocalDate.of(2026, 8, 18));
         
         CreateExpenseRequest req = new CreateExpenseRequest();
-        req.setIdempotencyKey(key);
-        req.setAmount(BigDecimal.valueOf(100)); // Different amount
-        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+                req.setAmount(BigDecimal.valueOf(100)); // Different amount
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        assertThrows(IllegalArgumentException.class, () -> recordService.createExpense(req, 1L));
+        assertThrows(IllegalArgumentException.class, () -> recordService.createExpense(req, key, 1L));
         verify(recordRepository, never()).saveAndFlush(any());
     }
 
@@ -213,9 +207,8 @@ public class ExpenseServiceTest {
     void testIdempotentCreate_crossUserCollision_succeedsIndependently() {
         String key = "ABC";
         CreateExpenseRequest req = new CreateExpenseRequest();
-        req.setIdempotencyKey(key);
-        req.setAmount(BigDecimal.valueOf(50));
-        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+                req.setAmount(BigDecimal.valueOf(50));
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
         User userB = new User();
@@ -252,8 +245,8 @@ public class ExpenseServiceTest {
             return saved2;
         });
 
-        ExpenseResponse result1 = recordService.createExpense(req, 1L);
-        ExpenseResponse result2 = recordService.createExpense(req, 2L);
+        ExpenseResponse result1 = recordService.createExpense(req, key, 1L);
+        ExpenseResponse result2 = recordService.createExpense(req, key, 2L);
 
         assertEquals(101L, result1.getExpenseId());
         assertEquals(102L, result2.getExpenseId());

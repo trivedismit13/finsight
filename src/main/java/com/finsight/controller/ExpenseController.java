@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -53,16 +54,19 @@ public class ExpenseController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> create(
             @Valid @RequestBody CreateExpenseRequest req,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @AuthenticationPrincipal UserDetails principal) {
         Long actorId = resolveUserId(principal);
-        ExpenseResponse rec = service.createExpense(req, actorId);
+        ExpenseResponse rec = service.createExpense(req, idempotencyKey, actorId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ApiResponse<>("Record created", rec));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateExpenseRequest req,
@@ -73,6 +77,7 @@ public class ExpenseController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<Void> delete(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {
@@ -82,6 +87,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> submit(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {
@@ -91,6 +97,7 @@ public class ExpenseController {
     }
 
     @GetMapping("/team")
+    @PreAuthorize("hasAnyRole('MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Slice<ExpenseResponse>>> getTeamExpenses(
             org.springframework.data.domain.Pageable pageable,
             @AuthenticationPrincipal UserDetails principal) {
@@ -99,6 +106,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/approve")
+    @PreAuthorize("hasAnyRole('MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> approve(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {
@@ -108,6 +116,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/reject")
+    @PreAuthorize("hasAnyRole('MANAGER', 'FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> reject(
             @PathVariable Long id,
             @Valid @RequestBody RejectExpenseRequest req,
@@ -118,6 +127,7 @@ public class ExpenseController {
     }
 
     @GetMapping("/admin/all")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<ExpenseResponse>>> getAllRecordsAdmin(
             @RequestParam(value = "page", required = false) Integer pageNumber,
             @RequestParam(required = false) String status,
@@ -136,6 +146,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/admin/{id}/process")
+    @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> process(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {

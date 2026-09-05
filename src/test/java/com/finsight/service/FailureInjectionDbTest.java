@@ -104,12 +104,10 @@ public class FailureInjectionDbTest {
 
         com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
         req.setAmount(new BigDecimal("100.00"));
-        req.setCategory(com.finsight.model.ExpenseCategory.OTHER.name());
+        req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.now());
-        req.setIdempotencyKey("PARTIAL_FAIL_KEY");
-
-        // The transaction should completely rollback
-        assertThrows(RuntimeException.class, () -> recordService.createExpense(req, testUser.getUserId()));
+                // The transaction should completely rollback
+        assertThrows(RuntimeException.class, () -> recordService.createExpense(req, "PARTIAL_FAIL_KEY", testUser.getUserId()));
 
         // Verify that NO partial state exists (the financial record should be gone)
         long recordCount = recordRepository.count();
@@ -142,11 +140,11 @@ public class FailureInjectionDbTest {
             // Trigger notification
             com.finsight.dto.request.CreateExpenseRequest req = new com.finsight.dto.request.CreateExpenseRequest();
             req.setAmount(new BigDecimal("60.00"));
-            req.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+            req.setCategory(com.finsight.model.ExpenseCategory.MEALS);
             req.setExpenseDate(LocalDate.of(2026, 8, 1));
             
             try {
-                com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, testUser.getUserId());
+                com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, "PARTIAL_FAIL_KEY", testUser.getUserId());
                 recordService.submitExpense(res.getExpenseId(), testUser.getUserId());
                 recordService.approveExpense(res.getExpenseId(), testManager.getUserId());
             } catch (Exception e) {

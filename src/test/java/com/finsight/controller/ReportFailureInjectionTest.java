@@ -69,7 +69,7 @@ public class ReportFailureInjectionTest {
         AtomicBoolean fileExistedDuringWrite = new AtomicBoolean(false);
         // Mock the fetchAndWriteReportChunk to throw an exception to simulate write failure
         Mockito.doAnswer(invocation -> {
-            BufferedWriter writer = invocation.getArgument(5);
+            java.io.Writer writer = invocation.getArgument(3);
             writer.write("1,2026-08-01,EXPENSE,Food,100,PartialWrite\n");
             writer.flush();
             
@@ -79,7 +79,7 @@ public class ReportFailureInjectionTest {
             fileExistedDuringWrite.set(true); // Since flush succeeded, the file is physically on disk
             
             throw new IOException("Simulated disk full");
-        }).when(reportExportService).fetchAndWriteReportChunk(any(), anyLong(), any(), any(), any(), any());
+        }).when(reportExportService).fetchAndWriteReportChunk(any(), any(), any(), any());
 
         // Trigger job creation
         Long jobId = reportExportService.requestReport(testUser.getUserId(), "2026-08");

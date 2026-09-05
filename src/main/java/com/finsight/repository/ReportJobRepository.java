@@ -19,6 +19,6 @@ public interface ReportJobRepository extends JpaRepository<ReportJob, Long> {
     int claimJob(@Param("jobId") Long jobId);
 
     @Modifying
-    @Query("UPDATE ReportJob r SET r.status = :status, r.completedAt = :completedAt, r.filePath = :filePath WHERE r.jobId = :jobId AND r.status = 'PROCESSING'")
-    int updateJobState(@Param("jobId") Long jobId, @Param("status") String status, @Param("completedAt") LocalDateTime completedAt, @Param("filePath") String filePath);
+    @Query("UPDATE ReportJob r SET r.status = :status, r.completedAt = :completedAt, r.filePath = :filePath, r.failureReason = :failureReason WHERE r.jobId = :jobId AND r.status = 'PROCESSING'")
+    int updateJobState(@Param("jobId") Long jobId, @Param("status") String status, @Param("completedAt") LocalDateTime completedAt, @Param("filePath") String filePath, @Param("failureReason") String failureReason);
 }

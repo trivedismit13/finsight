@@ -13,11 +13,9 @@ public class UpdateExpenseRequest {
     @jakarta.validation.constraints.DecimalMax(value = "9999999999999.99")
     @jakarta.validation.constraints.Digits(integer = 13, fraction = 2)
     private BigDecimal amount;
-    @NotBlank
-    @Pattern(regexp = "^(INCOME|EXPENSE)$", message = "Type must be INCOME or EXPENSE")
-    private String type;
-    @NotBlank
-    private String category;
+
+    @jakarta.validation.constraints.NotNull
+    private com.finsight.model.ExpenseCategory category;
     @jakarta.validation.constraints.NotNull
     private LocalDate expenseDate;
     private String description;

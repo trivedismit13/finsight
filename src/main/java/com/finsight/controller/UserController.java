@@ -41,4 +41,13 @@ public class UserController {
         UserResponse updated = userService.updateRoleAndStatus(id, role, isActive, actorId);
         return ResponseEntity.ok(new ApiResponse<>("User updated", updated));
     }
+    @PutMapping("/{id}/manager")
+    public ResponseEntity<ApiResponse<UserResponse>> updateManager(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long managerId,
+            @AuthenticationPrincipal UserDetails principal) {
+        Long actorId = resolveUserId(principal);
+        UserResponse updated = userService.updateManager(id, managerId, actorId);
+        return ResponseEntity.ok(new ApiResponse<>("Manager assigned", updated));
+    }
 }

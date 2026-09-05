@@ -76,7 +76,7 @@ public class ExpenseService {
 
         // Audit log (REQUIRED — atomic with the business transaction, rolls back if this tx rolls back)
         auditLogService.record(actorUserId, "CREATE_RECORD", "RECORD", record.getExpenseId(),
-                "Created record: amount=" + record.getAmount() + " category=" + record.getCategory());
+                "Created record: " + record.getExpenseId());
 
 
         return toResponse(record);
@@ -203,7 +203,7 @@ public class ExpenseService {
         recordRepository.save(record);
 
         auditLogService.record(actorUserId, "DELETE_RECORD", "RECORD", record.getExpenseId(),
-                "Soft deleted record: " + id);
+                "Deleted record: " + record.getExpenseId());
     }
 
     @Transactional
@@ -224,7 +224,7 @@ public class ExpenseService {
         record = recordRepository.save(record);
 
         auditLogService.record(actorUserId, "SUBMIT_EXPENSE", "RECORD", record.getExpenseId(),
-                "Submitted expense for approval");
+                "Submitted record: " + record.getExpenseId());
 
         return toResponse(record);
     }
@@ -304,7 +304,7 @@ public class ExpenseService {
         record = recordRepository.save(record);
 
         auditLogService.record(managerId, "APPROVE_EXPENSE", "RECORD", record.getExpenseId(),
-                "Approved expense");
+                "Approved record: " + record.getExpenseId());
 
         notificationDispatcherService.enqueueNotification(
                 record.getCreatedBy().getUserId(),
@@ -341,7 +341,7 @@ public class ExpenseService {
         record = recordRepository.save(record);
 
         auditLogService.record(managerId, "REJECT_EXPENSE", "RECORD", record.getExpenseId(),
-                "Rejected expense: " + reason);
+                "Rejected record: " + record.getExpenseId());
 
         notificationDispatcherService.enqueueNotification(
                 record.getCreatedBy().getUserId(),

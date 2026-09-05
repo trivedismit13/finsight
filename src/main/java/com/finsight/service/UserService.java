@@ -21,7 +21,7 @@ public class UserService {
 
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public List<UserResponse> getAllUsers() {
-        return userRepository.findAll().stream()
+        return userRepository.findByIsActiveTrue().stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }

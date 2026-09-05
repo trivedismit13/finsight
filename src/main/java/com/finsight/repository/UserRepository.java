@@ -12,6 +12,8 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
+    
+    java.util.List<User> findByIsActiveTrue();
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM User u WHERE u.email = :email")

@@ -107,6 +107,7 @@ public class UserService {
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .managerId(user.getManager() != null ? user.getManager().getUserId() : null)
+                .isActive(user.isActive())
                 .build();
     }
 }

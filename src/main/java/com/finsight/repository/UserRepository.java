@@ -13,6 +13,10 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"manager"})
+    java.util.List<User> findAll();
+    
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"manager"})
     java.util.List<User> findByIsActiveTrue();
     java.util.List<User> findByRoleAndIsActiveTrue(com.finsight.model.Role role);
     long countByManager(User manager);

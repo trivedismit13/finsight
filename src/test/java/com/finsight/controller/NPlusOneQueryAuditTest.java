@@ -136,9 +136,9 @@ class NPlusOneQueryAuditTest {
         
         String responseBody = mockMvc.perform(get("/api/admin/audit"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(10)))
-                .andExpect(jsonPath("$[0].actorName", notNullValue()))
-                .andExpect(jsonPath("$[0].password").doesNotExist()) // explicit leak check
+                .andExpect(jsonPath("$.data.content", hasSize(10)))
+                .andExpect(jsonPath("$.data.content[0].actorName", notNullValue()))
+                .andExpect(jsonPath("$.data.content[0].password").doesNotExist()) // explicit leak check
                 .andReturn().getResponse().getContentAsString();
                 
         assertTrue(!responseBody.contains("hashedpassword"), "Password must not be in response");

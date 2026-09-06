@@ -3,6 +3,7 @@ package com.finsight.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finsight.dto.request.CreateExpenseRequest;
 import com.finsight.dto.request.LoginRequest;
+import com.finsight.dto.request.UpdateExpenseRequest;
 import com.finsight.dto.request.RegisterRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +83,34 @@ public class ValidationIntegrationTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(login)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @com.finsight.security.WithMockCustomUser(username = "finance_admin@example.com", roles = "FINANCE_ADMIN")
+    public void testAdvancedValidations() throws Exception {
+        // invalid status -> 400
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/expenses?status=INVALID_STATUS"))
+                .andExpect(status().isBadRequest());
+                
+        // invalid category -> 400
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/expenses?category=NOT_A_CATEGORY"))
+                .andExpect(status().isBadRequest());
+                
+        // missing version on update -> 400
+        UpdateExpenseRequest updateReq = new UpdateExpenseRequest();
+        updateReq.setAmount(new BigDecimal("100.00"));
+        updateReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        updateReq.setExpenseDate(LocalDate.now());
+        // version is missing
+        
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/api/expenses/1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(updateReq)))
+                .andExpect(status().isBadRequest());
+                
+        // startDate > endDate -> 400
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/analytics/company?startDate=2023-02-01&endDate=2023-01-01"))
                 .andExpect(status().isBadRequest());
     }
 }

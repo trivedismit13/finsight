@@ -19,7 +19,12 @@ public class DashboardController {
     public Map<String, Object> getCompanyAnalytics(
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate endDate) {
-        return dashboardService.getCompanyAnalytics(resolveStartDate(startDate), resolveEndDate(endDate));
+        LocalDate start = resolveStartDate(startDate);
+        LocalDate end = resolveEndDate(endDate);
+        if (start.isAfter(end)) {
+            throw new com.finsight.exception.InvalidRequestException("startDate cannot be after endDate");
+        }
+        return dashboardService.getCompanyAnalytics(start, end);
     }
 
     private LocalDate resolveStartDate(LocalDate provided) {

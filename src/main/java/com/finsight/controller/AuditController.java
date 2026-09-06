@@ -12,7 +12,8 @@ public class AuditController {
     private final AuditLogService auditLogService;
 
     @GetMapping
-    public java.util.List<com.finsight.dto.response.AuditLogResponse> getAllAuditLogs() {
-        return auditLogService.getAllAuditLogs();
+    public org.springframework.http.ResponseEntity<com.finsight.dto.response.ApiResponse<org.springframework.data.domain.Page<com.finsight.dto.response.AuditLogResponse>>> getAllAuditLogs(
+            org.springframework.data.domain.Pageable pageable) {
+        return org.springframework.http.ResponseEntity.ok(new com.finsight.dto.response.ApiResponse<>("Audit logs fetched", auditLogService.getAllAuditLogs(pageable)));
     }
 }

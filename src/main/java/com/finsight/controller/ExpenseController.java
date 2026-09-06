@@ -48,6 +48,14 @@ public class ExpenseController {
                 throw new com.finsight.exception.InvalidRequestException("Status is invalid");
             }
         }
+        
+        if (category != null) {
+            try {
+                com.finsight.model.ExpenseCategory.valueOf(category);
+            } catch (IllegalArgumentException e) {
+                throw new com.finsight.exception.InvalidRequestException("Category is invalid");
+            }
+        }
 
         Long actorId = resolveUserId(principal);
         return ResponseEntity.ok(new ApiResponse<>("Expenses fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId)));
@@ -139,6 +147,22 @@ public class ExpenseController {
         
         if (pageNumber != null && pageNumber < 0) {
             throw new com.finsight.exception.InvalidRequestException("Page number cannot be less than zero.");
+        }
+
+        if (status != null) {
+            try {
+                com.finsight.model.ExpenseStatus.valueOf(status);
+            } catch (IllegalArgumentException e) {
+                throw new com.finsight.exception.InvalidRequestException("Status is invalid");
+            }
+        }
+        
+        if (category != null) {
+            try {
+                com.finsight.model.ExpenseCategory.valueOf(category);
+            } catch (IllegalArgumentException e) {
+                throw new com.finsight.exception.InvalidRequestException("Category is invalid");
+            }
         }
 
         Long actorId = resolveUserId(principal);

@@ -33,8 +33,8 @@ public class AuditLogService {
     }
     @Transactional(readOnly = true)
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
-    public List<com.finsight.dto.response.AuditLogResponse> getAllAuditLogs() {
-        return auditLogRepository.findAll().stream().map(log -> com.finsight.dto.response.AuditLogResponse.builder()
+    public org.springframework.data.domain.Page<com.finsight.dto.response.AuditLogResponse> getAllAuditLogs(org.springframework.data.domain.Pageable pageable) {
+        return auditLogRepository.findAll(pageable).map(log -> com.finsight.dto.response.AuditLogResponse.builder()
                 .auditId(log.getAuditId())
                 .actorUserId(log.getActorUserId() != null ? log.getActorUserId().getUserId() : null)
                 .actorName(log.getActorUserId() != null ? log.getActorUserId().getName() : null)
@@ -43,6 +43,6 @@ public class AuditLogService {
                 .entityId(log.getEntityId())
                 .details(log.getDetails())
                 .createdAt(log.getCreatedAt())
-                .build()).collect(Collectors.toList());
+                .build());
     }
 }

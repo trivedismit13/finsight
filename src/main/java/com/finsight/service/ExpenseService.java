@@ -166,7 +166,7 @@ public class ExpenseService {
         }
 
         if (expense.getStatus() != ExpenseStatus.DRAFT && expense.getStatus() != ExpenseStatus.REJECTED) {
-            throw new IllegalStateException("Only DRAFT or REJECTED expenses can be updated.");
+            throw new com.finsight.exception.ConflictException("Only DRAFT or REJECTED expenses can be updated.");
         }
 
         if (!expense.getVersion().equals(req.getVersion())) {
@@ -199,7 +199,7 @@ public class ExpenseService {
         }
 
         if (expense.getStatus() != ExpenseStatus.DRAFT) {
-            throw new IllegalStateException("Only DRAFT expenses can be deleted.");
+            throw new com.finsight.exception.ConflictException("Only DRAFT expenses can be deleted.");
         }
 
         expense.setDeleted(true);
@@ -219,7 +219,7 @@ public class ExpenseService {
         }
 
         if (expense.getStatus() != ExpenseStatus.DRAFT && expense.getStatus() != ExpenseStatus.REJECTED) {
-            throw new IllegalStateException("Only DRAFT or REJECTED expenses can be submitted.");
+            throw new com.finsight.exception.ConflictException("Only DRAFT or REJECTED expenses can be submitted.");
         }
 
         User creator = expense.getCreatedBy();
@@ -313,7 +313,7 @@ public class ExpenseService {
         validateManagerAccess(expense, managerId);
 
         if (expense.getStatus() != ExpenseStatus.PENDING_APPROVAL) {
-            throw new IllegalStateException("Only PENDING_APPROVAL expenses can be approved.");
+            throw new com.finsight.exception.ConflictException("Only PENDING_APPROVAL expenses can be approved.");
         }
 
         User manager = userRepository.findById(managerId)
@@ -349,7 +349,7 @@ public class ExpenseService {
         validateManagerAccess(expense, managerId);
 
         if (expense.getStatus() != ExpenseStatus.PENDING_APPROVAL) {
-            throw new IllegalStateException("Only PENDING_APPROVAL expenses can be rejected.");
+            throw new com.finsight.exception.ConflictException("Only PENDING_APPROVAL expenses can be rejected.");
         }
 
         User manager = userRepository.findById(managerId)
@@ -380,7 +380,7 @@ public class ExpenseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
         if (expense.getStatus() != ExpenseStatus.APPROVED) {
-            throw new IllegalStateException("Only APPROVED expenses can be processed.");
+            throw new com.finsight.exception.ConflictException("Only APPROVED expenses can be processed.");
         }
 
         expense.setStatus(ExpenseStatus.PROCESSED);

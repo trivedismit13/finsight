@@ -17,6 +17,13 @@ public class NotificationDispatcherService {
     private final ApplicationEventPublisher eventPublisher;
     private final com.finsight.config.NotificationConfig config;
 
+    /**
+     * Persists a notification for external delivery.
+     * 
+     * Delivery semantics: AT-LEAST-ONCE. 
+     * Due to the possibility of crashes or external system timeouts after successful
+     * transmission but before updating the database, notifications may be delivered more than once.
+     */
     @org.springframework.transaction.annotation.Transactional
     public void enqueueNotification(Long userId, String type, String payload) {
         User user = userRepository.findById(userId).orElseThrow();

@@ -36,16 +36,20 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long>, JpaSpec
                                                  @Param("startDate") java.time.LocalDate startDate,
                                                  @Param("endDate") java.time.LocalDate endDate);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy", "approvedBy", "rejectedBy"})
     @Query("SELECT r FROM Expense r WHERE r.createdBy.manager.userId = :managerId " +
            "AND r.status != 'DRAFT' AND r.isDeleted = false")
     org.springframework.data.domain.Slice<Expense> findTeamExpenses(@Param("managerId") Long managerId, org.springframework.data.domain.Pageable pageable);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy", "approvedBy", "rejectedBy"})
     @Query("SELECT r FROM Expense r WHERE r.createdBy.userId = :userId AND r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate <= :endDate")
     org.springframework.data.domain.Slice<Expense> findByUserAndDateRange(@Param("userId") Long userId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate, org.springframework.data.domain.Pageable pageable);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy", "approvedBy", "rejectedBy"})
     @Query("SELECT r FROM Expense r WHERE r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate <= :endDate")
     org.springframework.data.domain.Slice<Expense> findAllByDateRange(@Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate, org.springframework.data.domain.Pageable pageable);
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"createdBy", "approvedBy", "rejectedBy"})
     @Query("SELECT r FROM Expense r WHERE (r.createdBy.userId = :userId OR r.createdBy.manager.userId = :userId) AND r.status IN ('APPROVED', 'PROCESSED') AND r.isDeleted = false AND r.expenseDate >= :startDate AND r.expenseDate <= :endDate")
     org.springframework.data.domain.Slice<Expense> findTeamByDateRange(@Param("userId") Long userId, @Param("startDate") java.time.LocalDate startDate, @Param("endDate") java.time.LocalDate endDate, org.springframework.data.domain.Pageable pageable);
 }

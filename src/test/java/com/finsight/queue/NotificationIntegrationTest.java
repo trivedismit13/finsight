@@ -52,6 +52,9 @@ public class NotificationIntegrationTest {
         testUser = userRepository.save(testUser);
     }
 
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
     @Test
     void test1_Persistence_PendingState() {
         Notification n = new Notification();
@@ -66,6 +69,35 @@ public class NotificationIntegrationTest {
         List<Notification> notifications = notificationRepository.findAll();
         assertEquals(1, notifications.size());
         assertEquals("PENDING", notifications.get(0).getStatus());
+    }
+
+    @Test
+    void testTransactionRollback_DoesNotEnqueue() {
+        java.util.concurrent.LinkedBlockingQueue<Long> isolatedQueue = new java.util.concurrent.LinkedBlockingQueue<>(100);
+        java.util.concurrent.BlockingQueue<Long> originalQueue = 
+            (java.util.concurrent.BlockingQueue<Long>) org.springframework.test.util.ReflectionTestUtils.getField(queueManager, "queue");
+        org.springframework.test.util.ReflectionTestUtils.setField(queueManager, "queue", isolatedQueue);
+        
+        try {
+            assertThrows(RuntimeException.class, () -> {
+                transactionTemplate.execute(status -> {
+                    dispatcherService.enqueueNotification(testUser.getUserId(), "TEST_ROLLBACK", "payload");
+                    throw new RuntimeException("Intentional rollback");
+                });
+            });
+
+            assertEquals(0, isolatedQueue.size(), "Notification should not be enqueued on rollback");
+
+            // Now test successful commit
+            transactionTemplate.execute(status -> {
+                dispatcherService.enqueueNotification(testUser.getUserId(), "TEST_COMMIT", "payload");
+                return null;
+            });
+            
+            assertEquals(1, isolatedQueue.size(), "Notification should be enqueued on commit");
+        } finally {
+            org.springframework.test.util.ReflectionTestUtils.setField(queueManager, "queue", originalQueue);
+        }
     }
 
     @Test

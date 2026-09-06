@@ -20,5 +20,6 @@ public class UpdateExpenseRequest {
     private LocalDate expenseDate;
     private String description;
     // Client must send back the version they read — Hibernate uses this for optimistic lock checking
+    @jakarta.validation.constraints.NotNull(message = "Version is required for optimistic locking")
     private Long version;
 }

@@ -26,7 +26,7 @@ import java.time.format.DateTimeFormatter;
 @Service
 @RequiredArgsConstructor
 public class ExpenseService {
-    private final ExpenseRepository recordRepository;
+    private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
     private final AuditLogService auditLogService;
     private final BudgetService budgetService;
@@ -37,9 +37,9 @@ public class ExpenseService {
     private ExpenseService self;
 
     public ExpenseResponse createExpense(CreateExpenseRequest req, String idempotencyKey, Long actorUserId) {
-        // Idempotency: if the key already exists, return the existing record (200 OK at controller level)
+        // Idempotency: if the key already exists, return the existing expense (200 OK at controller level)
         if (idempotencyKey != null) {
-            var existingOpt = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, idempotencyKey);
+            var existingOpt = expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, idempotencyKey);
             if (existingOpt.isPresent()) {
                 Expense existing = existingOpt.get();
                 verifyIdempotencyPayloadMatch(existing, req);
@@ -51,8 +51,8 @@ public class ExpenseService {
             return self.doCreateExpense(req, idempotencyKey, actorUserId);
         } catch (DataIntegrityViolationException e) {
             // Concurrent duplicate idempotency key — race condition between the check and the insert
-            Expense existing = recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, idempotencyKey)
-                    .orElseThrow(() -> new RuntimeException("Record creation failed unexpectedly"));
+            Expense existing = expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(actorUserId, idempotencyKey)
+                    .orElseThrow(() -> new RuntimeException("Expense creation failed unexpectedly"));
             verifyIdempotencyPayloadMatch(existing, req);
             return toResponse(existing);
         }
@@ -63,23 +63,23 @@ public class ExpenseService {
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Actor user not found"));
 
-        Expense record = new Expense();
-        record.setCreatedBy(actor);
-        record.setAmount(req.getAmount());
-        record.setCategory(req.getCategory());
-        record.setExpenseDate(req.getExpenseDate());
-        record.setDescription(req.getDescription());
-        record.setIdempotencyKey(idempotencyKey);
-        record.setStatus(ExpenseStatus.DRAFT);
+        Expense expense = new Expense();
+        expense.setCreatedBy(actor);
+        expense.setAmount(req.getAmount());
+        expense.setCategory(req.getCategory());
+        expense.setExpenseDate(req.getExpenseDate());
+        expense.setDescription(req.getDescription());
+        expense.setIdempotencyKey(idempotencyKey);
+        expense.setStatus(ExpenseStatus.DRAFT);
 
-        record = recordRepository.saveAndFlush(record);
+        expense = expenseRepository.saveAndFlush(expense);
 
         // Audit log (REQUIRED — atomic with the business transaction, rolls back if this tx rolls back)
-        auditLogService.record(actorUserId, "CREATE_EXPENSE", "EXPENSE", record.getExpenseId(),
-                "Created record: " + record.getExpenseId());
+        auditLogService.record(actorUserId, "CREATE_EXPENSE", "EXPENSE", expense.getExpenseId(),
+                "Created expense: " + expense.getExpenseId());
 
 
-        return toResponse(record);
+        return toResponse(expense);
     }
 
     @Transactional(readOnly = true)
@@ -153,83 +153,83 @@ public class ExpenseService {
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
         };
 
-        return recordRepository.findAll(spec, pageable).map(this::toResponse);
+        return expenseRepository.findAll(spec, pageable).map(this::toResponse);
     }
 
     @Transactional
     public ExpenseResponse updateExpense(Long id, UpdateExpenseRequest req, Long actorUserId) {
-        Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
+        Expense expense = expenseRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
-        if (!record.getCreatedBy().getUserId().equals(actorUserId)) {
+        if (!expense.getCreatedBy().getUserId().equals(actorUserId)) {
             throw new AccessDeniedException("Only the owner can update this expense.");
         }
 
-        if (record.getStatus() != ExpenseStatus.DRAFT && record.getStatus() != ExpenseStatus.REJECTED) {
+        if (expense.getStatus() != ExpenseStatus.DRAFT && expense.getStatus() != ExpenseStatus.REJECTED) {
             throw new IllegalStateException("Only DRAFT or REJECTED expenses can be updated.");
         }
 
-        if (!record.getVersion().equals(req.getVersion())) {
-            throw new org.springframework.dao.OptimisticLockingFailureException("Record " + id + " was modified by another user. Client has version=" + req.getVersion() + " but current is version=" + record.getVersion() + ". Please refresh and retry.");
+        if (!expense.getVersion().equals(req.getVersion())) {
+            throw new org.springframework.dao.OptimisticLockingFailureException("Expense " + id + " was modified by another user. Client has version=" + req.getVersion() + " but current is version=" + expense.getVersion() + ". Please refresh and retry.");
         }
 
         // Snapshot state for audit
-        String oldState = record.getAmount() + "|" + record.getCategory();
+        String oldState = expense.getAmount() + "|" + expense.getCategory();
 
-        record.setAmount(req.getAmount());
-        record.setCategory(req.getCategory());
-        record.setExpenseDate(req.getExpenseDate());
-        record.setDescription(req.getDescription());
+        expense.setAmount(req.getAmount());
+        expense.setCategory(req.getCategory());
+        expense.setExpenseDate(req.getExpenseDate());
+        expense.setDescription(req.getDescription());
 
-        record = recordRepository.save(record);
+        expense = expenseRepository.save(expense);
 
-        auditLogService.record(actorUserId, "UPDATE_EXPENSE", "EXPENSE", record.getExpenseId(),
-                "Updated record from [" + oldState + "] to [" + record.getAmount() + "|" + record.getCategory() + "]");
+        auditLogService.record(actorUserId, "UPDATE_EXPENSE", "EXPENSE", expense.getExpenseId(),
+                "Updated expense from [" + oldState + "] to [" + expense.getAmount() + "|" + expense.getCategory() + "]");
 
-        return toResponse(record);
+        return toResponse(expense);
     }
 
     @Transactional
     public void deleteExpense(Long id, Long actorUserId) {
-        Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
+        Expense expense = expenseRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
-        if (!record.getCreatedBy().getUserId().equals(actorUserId)) {
+        if (!expense.getCreatedBy().getUserId().equals(actorUserId)) {
             throw new AccessDeniedException("Only the owner can delete this expense.");
         }
 
-        if (record.getStatus() != ExpenseStatus.DRAFT) {
+        if (expense.getStatus() != ExpenseStatus.DRAFT) {
             throw new IllegalStateException("Only DRAFT expenses can be deleted.");
         }
 
-        record.setDeleted(true);
-        recordRepository.save(record);
+        expense.setDeleted(true);
+        expenseRepository.save(expense);
 
-        auditLogService.record(actorUserId, "DELETE_EXPENSE", "EXPENSE", record.getExpenseId(),
-                "Deleted record: " + record.getExpenseId());
+        auditLogService.record(actorUserId, "DELETE_EXPENSE", "EXPENSE", expense.getExpenseId(),
+                "Deleted expense: " + expense.getExpenseId());
     }
 
     @Transactional
     public ExpenseResponse submitExpense(Long id, Long actorUserId) {
-        Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
+        Expense expense = expenseRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
-        if (!record.getCreatedBy().getUserId().equals(actorUserId)) {
+        if (!expense.getCreatedBy().getUserId().equals(actorUserId)) {
             throw new AccessDeniedException("Only the owner can submit this expense.");
         }
 
-        if (record.getStatus() != ExpenseStatus.DRAFT && record.getStatus() != ExpenseStatus.REJECTED) {
+        if (expense.getStatus() != ExpenseStatus.DRAFT && expense.getStatus() != ExpenseStatus.REJECTED) {
             throw new IllegalStateException("Only DRAFT or REJECTED expenses can be submitted.");
         }
 
-        record.setStatus(ExpenseStatus.PENDING_APPROVAL);
-        record.setSubmittedAt(LocalDateTime.now());
-        record = recordRepository.save(record);
+        expense.setStatus(ExpenseStatus.PENDING_APPROVAL);
+        expense.setSubmittedAt(LocalDateTime.now());
+        expense = expenseRepository.save(expense);
 
-        auditLogService.record(actorUserId, "SUBMIT_EXPENSE", "EXPENSE", record.getExpenseId(),
-                "Submitted record: " + record.getExpenseId());
+        auditLogService.record(actorUserId, "SUBMIT_EXPENSE", "EXPENSE", expense.getExpenseId(),
+                "Submitted expense: " + expense.getExpenseId());
 
-        return toResponse(record);
+        return toResponse(expense);
     }
 
     /**
@@ -279,109 +279,109 @@ public class ExpenseService {
     }
 
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public Expense saveExpenseRequiresNew(Expense record) {
-        return recordRepository.saveAndFlush(record);
+    public Expense saveExpenseRequiresNew(Expense expense) {
+        return expenseRepository.saveAndFlush(expense);
     }
 
     public org.springframework.data.domain.Slice<ExpenseResponse> getTeamExpenses(Long managerId, org.springframework.data.domain.Pageable pageable) {
-        return recordRepository.findTeamExpenses(managerId, pageable).map(this::toResponse);
+        return expenseRepository.findTeamExpenses(managerId, pageable).map(this::toResponse);
     }
 
     @Transactional
     public ExpenseResponse approveExpense(Long id, Long managerId) {
-        Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
+        Expense expense = expenseRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
-        validateManagerAccess(record, managerId);
+        validateManagerAccess(expense, managerId);
 
-        if (record.getStatus() != ExpenseStatus.PENDING_APPROVAL) {
+        if (expense.getStatus() != ExpenseStatus.PENDING_APPROVAL) {
             throw new IllegalStateException("Only PENDING_APPROVAL expenses can be approved.");
         }
 
         User manager = userRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
 
-        record.setStatus(ExpenseStatus.APPROVED);
-        record.setApprovedAt(LocalDateTime.now());
-        record.setApprovedBy(manager);
-        record = recordRepository.save(record);
+        expense.setStatus(ExpenseStatus.APPROVED);
+        expense.setApprovedAt(LocalDateTime.now());
+        expense.setApprovedBy(manager);
+        expense = expenseRepository.save(expense);
 
-        auditLogService.record(managerId, "APPROVE_EXPENSE", "EXPENSE", record.getExpenseId(),
-                "Approved record: " + record.getExpenseId());
+        auditLogService.record(managerId, "APPROVE_EXPENSE", "EXPENSE", expense.getExpenseId(),
+                "Approved expense: " + expense.getExpenseId());
 
         notificationDispatcherService.enqueueNotification(
-                record.getCreatedBy().getUserId(),
+                expense.getCreatedBy().getUserId(),
                 "EXPENSE_APPROVED",
                 "Your expense " + id + " has been approved."
         );
 
-        if (record.getCategory() != null && record.getExpenseDate() != null) {
-            String monthYear = record.getExpenseDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            budgetService.checkBudgetExceededAfterRecord(record.getCategory().name(), monthYear, managerId);
+        if (expense.getCategory() != null && expense.getExpenseDate() != null) {
+            String monthYear = expense.getExpenseDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            budgetService.checkBudgetExceededAfterRecord(expense.getCategory(), monthYear, managerId);
         }
 
-        return toResponse(record);
+        return toResponse(expense);
     }
 
     @Transactional
     public ExpenseResponse rejectExpense(Long id, Long managerId, String reason) {
-        Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
+        Expense expense = expenseRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
-        validateManagerAccess(record, managerId);
+        validateManagerAccess(expense, managerId);
 
-        if (record.getStatus() != ExpenseStatus.PENDING_APPROVAL) {
+        if (expense.getStatus() != ExpenseStatus.PENDING_APPROVAL) {
             throw new IllegalStateException("Only PENDING_APPROVAL expenses can be rejected.");
         }
 
         User manager = userRepository.findById(managerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Manager not found"));
 
-        record.setStatus(ExpenseStatus.REJECTED);
-        record.setRejectedAt(LocalDateTime.now());
-        record.setRejectedBy(manager);
-        record.setRejectionReason(reason);
-        record = recordRepository.save(record);
+        expense.setStatus(ExpenseStatus.REJECTED);
+        expense.setRejectedAt(LocalDateTime.now());
+        expense.setRejectedBy(manager);
+        expense.setRejectionReason(reason);
+        expense = expenseRepository.save(expense);
 
-        auditLogService.record(managerId, "REJECT_EXPENSE", "EXPENSE", record.getExpenseId(),
-                "Rejected record: " + record.getExpenseId());
+        auditLogService.record(managerId, "REJECT_EXPENSE", "EXPENSE", expense.getExpenseId(),
+                "Rejected expense: " + expense.getExpenseId());
 
         notificationDispatcherService.enqueueNotification(
-                record.getCreatedBy().getUserId(),
+                expense.getCreatedBy().getUserId(),
                 "EXPENSE_REJECTED",
                 "Your expense " + id + " has been rejected. Reason: " + reason
         );
 
-        return toResponse(record);
+        return toResponse(expense);
     }
 
     @Transactional
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public ExpenseResponse processExpense(Long id, Long adminId) {
-        Expense record = recordRepository.findByIdAndIsDeletedFalse(id)
+        Expense expense = expenseRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Expense not found: " + id));
 
-        if (record.getStatus() != ExpenseStatus.APPROVED) {
+        if (expense.getStatus() != ExpenseStatus.APPROVED) {
             throw new IllegalStateException("Only APPROVED expenses can be processed.");
         }
 
-        record.setStatus(ExpenseStatus.PROCESSED);
-        record = recordRepository.save(record);
+        expense.setStatus(ExpenseStatus.PROCESSED);
+        expense = expenseRepository.save(expense);
 
-        auditLogService.record(adminId, "PROCESS_EXPENSE", "EXPENSE", record.getExpenseId(),
+        auditLogService.record(adminId, "PROCESS_EXPENSE", "EXPENSE", expense.getExpenseId(),
                 "Processed expense");
 
         notificationDispatcherService.enqueueNotification(
-                record.getCreatedBy().getUserId(),
+                expense.getCreatedBy().getUserId(),
                 "EXPENSE_PROCESSED",
                 "Your expense " + id + " has been processed."
         );
 
-        return toResponse(record);
+        return toResponse(expense);
     }
 
-    private void validateManagerAccess(Expense record, Long managerId) {
-        User creator = record.getCreatedBy();
+    private void validateManagerAccess(Expense expense, Long managerId) {
+        User creator = expense.getCreatedBy();
         if (creator.getManager() == null || !creator.getManager().getUserId().equals(managerId)) {
             throw new AccessDeniedException("You are not the manager of the user who submitted this expense.");
         }

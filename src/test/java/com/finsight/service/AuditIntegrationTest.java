@@ -85,7 +85,7 @@ public class AuditIntegrationTest {
 
         // Force a failure in the business logic AFTER audit is called in approveExpense
         doThrow(new RuntimeException("Simulated budget error"))
-            .when(budgetService).checkBudgetExceededAfterRecord(anyString(), anyString(), anyLong());
+            .when(budgetService).checkBudgetExceededAfterRecord(any(com.finsight.model.ExpenseCategory.class), anyString(), anyLong());
         
         try {
             expenseService.approveExpense(res.getExpenseId(), testManager.getUserId());
@@ -119,14 +119,14 @@ public class AuditIntegrationTest {
     }
     @Test
     void testDeleteRecord_auditRollback() {
-        Expense record = new Expense();
-        record.setAmount(new BigDecimal("100.00"));
-        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
-        record.setExpenseDate(LocalDate.now());
-        record.setCreatedBy(testUser);
-        record = expenseRepository.save(record);
+        Expense expense = new Expense();
+        expense.setAmount(new BigDecimal("100.00"));
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setExpenseDate(LocalDate.now());
+        expense.setCreatedBy(testUser);
+        expense = expenseRepository.save(expense);
         
-        Long expenseId = record.getExpenseId();
+        Long expenseId = expense.getExpenseId();
 
         doThrow(new RuntimeException("Audit DB Down")).when(auditLogService)
                 .record(any(), eq("DELETE_EXPENSE"), anyString(), any(), anyString());

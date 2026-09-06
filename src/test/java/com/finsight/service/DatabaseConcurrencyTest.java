@@ -43,7 +43,7 @@ public class DatabaseConcurrencyTest {
     private AuthService authService;
 
     @Autowired
-    private ExpenseService recordService;
+    private ExpenseService expenseService;
     
     @Autowired
     private BudgetService budgetService;
@@ -61,7 +61,7 @@ public class DatabaseConcurrencyTest {
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
     
     @Autowired
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
     
     @Autowired
     private BudgetRepository budgetRepository;
@@ -83,7 +83,7 @@ public class DatabaseConcurrencyTest {
     @BeforeEach
     void setUp() {
         auditLogRepository.deleteAll();
-        recordRepository.deleteAll();
+        expenseRepository.deleteAll();
         budgetRepository.deleteAll();
         notificationRepository.deleteAll();
         reportJobRepository.deleteAll();
@@ -140,13 +140,13 @@ public class DatabaseConcurrencyTest {
     // Test 2 — Expense optimistic locking
     @Test
     void testExpenseOptimisticLocking() throws InterruptedException {
-        Expense record = new Expense();
-        record.setCreatedBy(testUser);
-        record.setAmount(new BigDecimal("100.00"));
-        record.setCategory(com.finsight.model.ExpenseCategory.OTHER);
-        record.setExpenseDate(LocalDate.now());
-        record.setDescription("Initial");
-        Expense savedRecord = recordRepository.save(record);
+        Expense expense = new Expense();
+        expense.setCreatedBy(testUser);
+        expense.setAmount(new BigDecimal("100.00"));
+        expense.setCategory(com.finsight.model.ExpenseCategory.OTHER);
+        expense.setExpenseDate(LocalDate.now());
+        expense.setDescription("Initial");
+        Expense savedExpense = expenseRepository.save(expense);
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -164,11 +164,11 @@ public class DatabaseConcurrencyTest {
                     latch.await();
                     transactionTemplate.executeWithoutResult(status -> {
                         // Read current state inside transaction
-                        Expense r = recordRepository.findById(savedRecord.getExpenseId()).orElseThrow();
+                        Expense r = expenseRepository.findById(savedExpense.getExpenseId()).orElseThrow();
                         // Sleep slightly to force overlap
                         try { Thread.sleep(100); } catch (Exception ignored) {}
                         r.setDescription("Updated by thread " + index);
-                        recordRepository.saveAndFlush(r); // Force flush to trigger version check
+                        expenseRepository.saveAndFlush(r); // Force flush to trigger version check
                     });
                     successCount.incrementAndGet();
                 } catch (ObjectOptimisticLockingFailureException e) {
@@ -199,7 +199,7 @@ public class DatabaseConcurrencyTest {
     @Test
     void testBudgetAlertRace() throws InterruptedException {
         Budget budget = new Budget();
-        budget.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        budget.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         budget.setMonthYear("2026-08");
         budget.setBudgetAmount(new BigDecimal("100.00"));
         budget.setCreatedBy(testUser);
@@ -213,7 +213,7 @@ public class DatabaseConcurrencyTest {
         r1.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         r1.setExpenseDate(LocalDate.of(2026, 8, 10));
         r1.setStatus(com.finsight.model.ExpenseStatus.APPROVED);
-        recordRepository.save(r1);
+        expenseRepository.save(r1);
 
         int threadCount = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threadCount);
@@ -228,7 +228,7 @@ public class DatabaseConcurrencyTest {
                     org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
                     latch.await();
                     transactionTemplate.executeWithoutResult(status -> {
-                        budgetService.checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory.MEALS.name(), "2026-08", testUser.getUserId());
+                        budgetService.checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory.MEALS, "2026-08", testUser.getUserId());
                     });
                 } catch (Exception e) {
                     exceptions.add(e);
@@ -255,7 +255,7 @@ public class DatabaseConcurrencyTest {
     @Test
     void testBudgetNotificationFailureAtomicity() {
         Budget budget = new Budget();
-        budget.setCategory(com.finsight.model.ExpenseCategory.TRAVEL.name());
+        budget.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
         budget.setMonthYear("2026-08");
         budget.setBudgetAmount(new BigDecimal("100.00"));
         budget.setCreatedBy(testUser);
@@ -457,7 +457,7 @@ public class DatabaseConcurrencyTest {
                     req.setAmount(new BigDecimal("150.00"));
                     req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
                     req.setExpenseDate(LocalDate.of(2026, 8, 18));
-                                        com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, idempotencyKey, testUser.getUserId());
+                                        com.finsight.dto.response.ExpenseResponse res = expenseService.createExpense(req, idempotencyKey, testUser.getUserId());
                     if (res != null && res.getExpenseId() != null) {
                         successfulResponses.incrementAndGet();
                     }
@@ -474,8 +474,8 @@ public class DatabaseConcurrencyTest {
 
         assertEquals(10, successfulResponses.get(), "All 10 requests should return a valid response (1 normal, 9 recovered via idempotency catch block). Exceptions: " + exceptions);
 
-        long recordCount = recordRepository.count();
-        assertEquals(1, recordCount, "Exactly ONE financial record should be created in the database");
+        long expenseCount = expenseRepository.count();
+        assertEquals(1, expenseCount, "Exactly ONE expense should be created in the database");
         assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         executor.shutdown();
     }
@@ -530,13 +530,13 @@ public class DatabaseConcurrencyTest {
     @Test
     void testApproveRejectConcurrency() throws InterruptedException {
         // Create an expense
-        Expense record = new Expense();
-        record.setCreatedBy(testUser);
-        record.setAmount(new BigDecimal("500.00"));
-        record.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
-        record.setExpenseDate(LocalDate.now());
-        record.setStatus(com.finsight.model.ExpenseStatus.PENDING_APPROVAL);
-        Expense savedRecord = recordRepository.save(record);
+        Expense expense = new Expense();
+        expense.setCreatedBy(testUser);
+        expense.setAmount(new BigDecimal("500.00"));
+        expense.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
+        expense.setExpenseDate(LocalDate.now());
+        expense.setStatus(com.finsight.model.ExpenseStatus.PENDING_APPROVAL);
+        Expense savedExpense = expenseRepository.save(expense);
         
         // Create a manager
         User manager = new User();
@@ -560,7 +560,7 @@ public class DatabaseConcurrencyTest {
         executor.submit(() -> {
             try {
                 latch.await();
-                recordService.approveExpense(savedRecord.getExpenseId(), savedManager.getUserId());
+                expenseService.approveExpense(savedExpense.getExpenseId(), savedManager.getUserId());
             } catch (Exception e) {
                 concurrencyExceptions.add(e);
             } finally {
@@ -572,7 +572,7 @@ public class DatabaseConcurrencyTest {
         executor.submit(() -> {
             try {
                 latch.await();
-                recordService.rejectExpense(savedRecord.getExpenseId(), savedManager.getUserId(), "Rejecting");
+                expenseService.rejectExpense(savedExpense.getExpenseId(), savedManager.getUserId(), "Rejecting");
             } catch (Exception e) {
                 concurrencyExceptions.add(e);
             } finally {
@@ -583,13 +583,32 @@ public class DatabaseConcurrencyTest {
         latch.countDown();
         assertTrue(done.await(5, TimeUnit.SECONDS));
         
-        Expense finalState = recordRepository.findById(savedRecord.getExpenseId()).orElseThrow();
+        Expense finalState = expenseRepository.findById(savedExpense.getExpenseId()).orElseThrow();
         
-        // Exactly one should succeed, one should fail (throw an exception like ObjectOptimisticLockingFailureException or IllegalStateException)
+
+        // Exactly one should succeed, one should fail
         assertEquals(1, concurrencyExceptions.size(), "Exactly one transaction should fail due to concurrent modification");
+        Exception ex = concurrencyExceptions.peek();
+        boolean isValidException = ex instanceof org.springframework.orm.ObjectOptimisticLockingFailureException || ex instanceof com.finsight.exception.InvalidRequestException || ex instanceof IllegalStateException;
+        assertTrue(isValidException, "Losing request should throw a concurrency or state exception");
         
         // Ensure final state is either APPROVED or REJECTED
         assertTrue(finalState.getStatus() == com.finsight.model.ExpenseStatus.APPROVED || finalState.getStatus() == com.finsight.model.ExpenseStatus.REJECTED);
+        
+        // Ensure exactly one audit event for approve/reject
+        long auditCount = auditLogRepository.findAll().stream()
+            .filter(a -> a.getEntityId().equals(savedExpense.getExpenseId()) && (a.getAction().equals("APPROVE_EXPENSE") || a.getAction().equals("REJECT_EXPENSE")))
+            .count();
+        assertEquals(1, auditCount, "Exactly one audit event should be created for the final state transition");
+        
+        // Ensure exactly one notification
+        long notifCount = transactionTemplate.execute(status -> 
+            notificationRepository.findAll().stream()
+                .filter(n -> n.getUserId().getUserId().equals(testUser.getUserId()) && n.getPayload().contains(savedExpense.getExpenseId().toString()))
+                .count()
+        );
+        assertEquals(1, notifCount, "Exactly one notification should be sent to the employee");
+
         
         executor.shutdown();
     }

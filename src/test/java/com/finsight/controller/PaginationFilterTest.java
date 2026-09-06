@@ -33,7 +33,7 @@ public class PaginationFilterTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -42,7 +42,7 @@ public class PaginationFilterTest {
 
     @BeforeEach
     void setUp() {
-        recordRepository.deleteAll();
+        expenseRepository.deleteAll();
         
         testUser = userRepository.findByEmail("test@example.com").orElseGet(() -> {
             User u = new User();
@@ -58,7 +58,7 @@ public class PaginationFilterTest {
         r1.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         r1.setExpenseDate(LocalDate.of(2026, 8, 1));
         r1.setCreatedBy(testUser);
-        recordRepository.save(r1);
+        expenseRepository.save(r1);
 
         Expense r2 = new Expense();
         r2.setAmount(new BigDecimal("200.00"));
@@ -66,7 +66,7 @@ public class PaginationFilterTest {
         r2.setExpenseDate(LocalDate.of(2026, 8, 15));
         r2.setCreatedBy(testUser);
         r2.setStatus(com.finsight.model.ExpenseStatus.APPROVED);
-        recordRepository.save(r2);
+        expenseRepository.save(r2);
 
         Expense deleted = new Expense();
         deleted.setAmount(new BigDecimal("50.00"));
@@ -74,7 +74,7 @@ public class PaginationFilterTest {
         deleted.setExpenseDate(LocalDate.of(2026, 8, 20));
         deleted.setCreatedBy(testUser);
         deleted.setDeleted(true);
-        recordRepository.save(deleted);
+        expenseRepository.save(deleted);
 
         com.finsight.security.CustomUserDetails principal = new com.finsight.security.CustomUserDetails(
                 "test@example.com", "password", true, true, true, true,

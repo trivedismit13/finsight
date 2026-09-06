@@ -50,7 +50,7 @@ public class ExpenseController {
         }
 
         Long actorId = resolveUserId(principal);
-        return ResponseEntity.ok(new ApiResponse<>("Records fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId)));
+        return ResponseEntity.ok(new ApiResponse<>("Expenses fetched", service.getAllExpenses(status, category, startDate, endDate, pageable, actorId)));
     }
 
     @PostMapping
@@ -62,7 +62,7 @@ public class ExpenseController {
         Long actorId = resolveUserId(principal);
         ExpenseResponse rec = service.createExpense(req, idempotencyKey, actorId);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse<>("Record created", rec));
+                .body(new ApiResponse<>("Expense created", rec));
     }
 
     @PutMapping("/{id}")
@@ -73,7 +73,7 @@ public class ExpenseController {
             @AuthenticationPrincipal UserDetails principal) {
         Long actorId = resolveUserId(principal);
         ExpenseResponse rec = service.updateExpense(id, req, actorId);
-        return ResponseEntity.ok(new ApiResponse<>("Record updated", rec));
+        return ResponseEntity.ok(new ApiResponse<>("Expense updated", rec));
     }
 
     @DeleteMapping("/{id}")
@@ -128,7 +128,7 @@ public class ExpenseController {
 
     @GetMapping("/admin/all")
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
-    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<ExpenseResponse>>> getAllRecordsAdmin(
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<ExpenseResponse>>> getAllExpensesAdmin(
             @RequestParam(value = "page", required = false) Integer pageNumber,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String category,

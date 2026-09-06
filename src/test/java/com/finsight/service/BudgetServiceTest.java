@@ -26,7 +26,7 @@ public class BudgetServiceTest {
     private UserRepository userRepository;
 
     @Mock
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
 
     @Mock
     private NotificationDispatcherService notificationDispatcherService;
@@ -45,7 +45,7 @@ public class BudgetServiceTest {
         testUser.setUserId(1L);
 
         testBudget = new Budget();
-        testBudget.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+        testBudget.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         testBudget.setMonthYear("2026-08");
         testBudget.setBudgetAmount(new BigDecimal("100.00"));
         testBudget.setAlertSent(false);
@@ -53,7 +53,7 @@ public class BudgetServiceTest {
 
     @Test
     void testCheckBudgetExceeded_AlertNotSent_WhenUnderBudget() {
-        when(recordRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
+        when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("50.00"));
 
         budgetService.checkBudgetExceeded(testBudget, 1L);
@@ -64,7 +64,7 @@ public class BudgetServiceTest {
 
     @Test
     void testCheckBudgetExceeded_SendsAlert_WhenOverBudget() {
-        when(recordRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
+        when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("150.00"));
         when(budgetRepository.markAlertSentIfFalse(testBudget.getBudgetId())).thenReturn(1);
 
@@ -77,7 +77,7 @@ public class BudgetServiceTest {
     void testCheckBudgetExceeded_PreventsAlertSpam() {
         testBudget.setAlertSent(true); // Alert already sent previously
 
-        when(recordRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
+        when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("200.00")); // Still over budget
 
         budgetService.checkBudgetExceeded(testBudget, 1L);
@@ -91,7 +91,7 @@ public class BudgetServiceTest {
     void testCheckBudgetExceeded_ResetsAlertState_WhenUnderBudgetAgain() {
         testBudget.setAlertSent(true); // Alert was sent previously
 
-        when(recordRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
+        when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("50.00")); // Now under budget (e.g. record deleted)
 
         budgetService.checkBudgetExceeded(testBudget, 1L);
@@ -105,13 +105,13 @@ public class BudgetServiceTest {
     void testCreateOrUpdateBudget_ResetsAlertState_WhenLimitIncreased() {
         testBudget.setAlertSent(true);
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(budgetRepository.findByCategoryAndMonthYear("MEALS", "2026-08")).thenReturn(Optional.of(testBudget));
+        when(budgetRepository.findByCategoryAndMonthYear(com.finsight.model.ExpenseCategory.MEALS, "2026-08")).thenReturn(Optional.of(testBudget));
         
         // Total spent is 150. Old limit was 100. New limit is 200.
-        when(recordRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any())).thenReturn(new BigDecimal("150.00"));
+        when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any())).thenReturn(new BigDecimal("150.00"));
         when(budgetRepository.save(any(Budget.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Budget updated = budgetService.createOrUpdateBudget(1L, "MEALS", "2026-08", new BigDecimal("200.00"));
+        Budget updated = budgetService.createOrUpdateBudget(1L, com.finsight.model.ExpenseCategory.MEALS, "2026-08", new BigDecimal("200.00"));
 
         assertFalse(updated.isAlertSent()); // Because 150 <= 200, state resets
         assertEquals(new BigDecimal("200.00"), updated.getBudgetAmount());

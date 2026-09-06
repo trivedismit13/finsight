@@ -48,7 +48,7 @@ class NPlusOneQueryAuditTest {
     private UserRepository userRepository;
 
     @Autowired
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
 
     @Autowired
     private AuditLogRepository auditLogRepository;
@@ -81,14 +81,14 @@ class NPlusOneQueryAuditTest {
                 r.setCategory(com.finsight.model.ExpenseCategory.MEALS);
                 r.setExpenseDate(LocalDate.now());
                 r.setCreatedBy(u);
-                recordRepository.save(r);
+                expenseRepository.save(r);
             }
             
             // Create Audit log
             AuditLog a = new AuditLog();
             a.setActorUserId(u);
             a.setAction("TEST");
-            a.setEntityType("RECORD");
+            a.setEntityType("EXPENSE");
             auditLogRepository.save(a);
             
             // Create Notification
@@ -103,7 +103,7 @@ class NPlusOneQueryAuditTest {
         
         // flush to DB to avoid pending inserts muddying the query counts
         userRepository.flush();
-        recordRepository.flush();
+        expenseRepository.flush();
         auditLogRepository.flush();
         notificationRepository.flush();
         

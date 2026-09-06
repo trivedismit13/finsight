@@ -85,15 +85,15 @@ class CrossUserAuthorizationTest {
     }
 
     private void createExpense(User user, ExpenseCategory category, String amount, LocalDate date) {
-        Expense record = new Expense();
-        record.setCreatedBy(user);
-        record.setCategory(category);
-        record.setAmount(new BigDecimal(amount));
-        record.setExpenseDate(date);
-        record.setDescription("Test");
-        record.setDeleted(false);
-        record.setStatus(ExpenseStatus.DRAFT);
-        expenseRepository.save(record);
+        Expense expense = new Expense();
+        expense.setCreatedBy(user);
+        expense.setCategory(category);
+        expense.setAmount(new BigDecimal(amount));
+        expense.setExpenseDate(date);
+        expense.setDescription("Test");
+        expense.setDeleted(false);
+        expense.setStatus(ExpenseStatus.DRAFT);
+        expenseRepository.save(expense);
     }
 
     @Test

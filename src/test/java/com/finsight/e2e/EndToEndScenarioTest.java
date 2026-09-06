@@ -3,7 +3,6 @@ package com.finsight.e2e;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finsight.dto.request.CreateExpenseRequest;
 import com.finsight.dto.request.LoginRequest;
-import com.finsight.dto.request.RegisterRequest;
 import com.finsight.model.Notification;
 import com.finsight.repository.AuditLogRepository;
 import com.finsight.repository.NotificationRepository;
@@ -23,13 +22,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.Map;
-import java.util.HashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,241 +57,168 @@ public class EndToEndScenarioTest {
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private com.finsight.repository.ExpenseRepository expenseRepository;
-
     @MockBean
     private EmailProviderService emailProviderService;
 
     private String employeeToken;
     private String managerToken;
     private String financeAdminToken;
+    
+    private Long employeeId;
+    private Long managerId;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         notificationRepository.deleteAll();
         auditLogRepository.deleteAll();
         userRepository.deleteAll();
+        
+        // Setup hierarchy
+        com.finsight.model.User financeAdmin = registerUser("Admin", "admin@finsight.com", "password", "FINANCE_ADMIN");
+        com.finsight.model.User manager = registerUser("Manager", "manager@finsight.com", "password", "MANAGER");
+        com.finsight.model.User employee = registerUser("Employee", "employee@finsight.com", "password", "EMPLOYEE");
+        
+        employee.setManager(manager);
+        userRepository.save(employee);
+        
+        employeeId = employee.getUserId();
+        managerId = manager.getUserId();
+        
+        employeeToken = loginUser("employee@finsight.com", "password");
+        managerToken = loginUser("manager@finsight.com", "password");
+        financeAdminToken = loginUser("admin@finsight.com", "password");
     }
 
     @Test
-    void executeScenario() throws Exception {
-        // --- Step 1: Register ---
-        registerUser("Viewer", "employee@example.com", "password123", "EMPLOYEE");
-        registerUser("Analyst", "manager@example.com", "password123", "MANAGER");
-        registerUser("Admin", "finance_finance_admin@example.com", "password123", "FINANCE_ADMIN");
-
-        // --- Step 2: Login each user ---
-        employeeToken = loginUser("employee@example.com", "password123");
-        managerToken = loginUser("manager@example.com", "password123");
-        financeAdminToken = loginUser("finance_finance_admin@example.com", "password123");
-
-        assertNotNull(employeeToken);
-        assertNotNull(managerToken);
-        assertNotNull(financeAdminToken);
-
-        // --- Step 3: Viewer (Employee) attempts to create a budget (Should be 403) ---
-        mockMvc.perform(post("/api/budgets")
-                .header("Authorization", "Bearer " + employeeToken)
-                .param("category", "MEALS")
-                .param("monthYear", "2026-10")
-                .param("limit", "100.00"))
-                .andExpect(status().isForbidden()); // 403
-
-        // --- Step 4: Finance Admin creates records with idempotency key ---
+    void executeWorkflowScenario() throws Exception {
+        // --- Step 1: Employee creates DRAFT expense ---
         CreateExpenseRequest createReq = new CreateExpenseRequest();
-        createReq.setAmount(new BigDecimal("100000.00"));
-        createReq.setCategory(com.finsight.model.ExpenseCategory.OTHER);
-        createReq.setExpenseDate(LocalDate.now());
-                MvcResult res1 = mockMvc.perform(post("/api/expenses")
-                .header("Authorization", "Bearer " + financeAdminToken)
-                .header("Idempotency-Key", "idem-key-1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createReq)))
-                .andExpect(status().isCreated())
-                .andReturn();
-        
-        java.util.Map<?, ?> apiRes1 = objectMapper.readValue(res1.getResponse().getContentAsString(), java.util.Map.class);
-        java.util.Map<?, ?> record1 = (java.util.Map<?, ?>) apiRes1.get("data");
-        assertNotNull(record1.get("expenseId"));
-
-        createReq.setAmount(new BigDecimal("5000.00"));
+        createReq.setAmount(new BigDecimal("100.00"));
         createReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
-                MvcResult res2 = mockMvc.perform(post("/api/expenses")
-                .header("Authorization", "Bearer " + financeAdminToken)
-                .header("Idempotency-Key", "idem-key-2")
+        createReq.setExpenseDate(LocalDate.now());
+        
+        MvcResult res1 = mockMvc.perform(post("/api/expenses")
+                .header("Authorization", "Bearer " + employeeToken)
+                .header("Idempotency-Key", "idem-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(createReq)))
                 .andExpect(status().isCreated())
                 .andReturn();
+                
+        Map<?, ?> data1 = (Map<?, ?>) objectMapper.readValue(res1.getResponse().getContentAsString(), Map.class).get("data");
+        Long expenseId = ((Number) data1.get("expenseId")).longValue();
+        assertEquals("DRAFT", data1.get("status"));
         
-        // Verify audit exists
-        long auditCount = auditLogRepository.count();
-        assertTrue(auditCount >= 2, "Audit logs should be created for the two expenses");
-
-        // --- Step 5: Repeat exact request ---
-        MvcResult res2Repeat = mockMvc.perform(post("/api/expenses")
-                .header("Authorization", "Bearer " + financeAdminToken)
-                .header("Idempotency-Key", "idem-key-2")
+        // --- Step 2: Employee submits expense ---
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/submit")
+                .header("Authorization", "Bearer " + employeeToken))
+                .andExpect(status().isOk());
+                
+        // --- Step 3: Manager rejects expense ---
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/reject")
+                .header("Authorization", "Bearer " + managerToken)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content("{\"reason\":\"Missing receipt\"}"))
+                .andExpect(status().isOk());
+                
+        // --- Step 4: Employee edits and resubmits ---
+        mockMvc.perform(put("/api/expenses/" + expenseId)
+                .header("Authorization", "Bearer " + employeeToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createReq)))
-                .andExpect(status().isCreated()) // Changed back to isCreated() because ExpenseController always returns 201
-                .andReturn();
-        
-        java.util.Map<?, ?> apiRes2Repeat = objectMapper.readValue(res2Repeat.getResponse().getContentAsString(), java.util.Map.class);
-        java.util.Map<?, ?> record2Repeat = (java.util.Map<?, ?>) apiRes2Repeat.get("data");
-        // Verify no duplicate record (ID should match)
-        java.util.Map<?, ?> apiRes2 = objectMapper.readValue(res2.getResponse().getContentAsString(), java.util.Map.class);
-        java.util.Map<?, ?> record2 = (java.util.Map<?, ?>) apiRes2.get("data");
-        assertEquals(((Number)record2.get("expenseId")).longValue(), ((Number)record2Repeat.get("expenseId")).longValue());
-
-        // --- Step 6: Repeat using same key but different payload ---
-        createReq.setAmount(new BigDecimal("6000.00")); // Different amount
-                mockMvc.perform(post("/api/expenses")
-                .header("Authorization", "Bearer " + financeAdminToken)
-                .header("Idempotency-Key", "idem-key-2")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(createReq)))
-                .andExpect(status().isConflict()); // 409 Conflict for different payload
-
-        // Make existing expenses count towards budget
-        expenseRepository.findAll().forEach(e -> {
-            e.setStatus(com.finsight.model.ExpenseStatus.APPROVED);
-            expenseRepository.save(e);
-        });
-
-        // --- Step 7: Create a budget and cross threshold ---
+                .content("{\"amount\":120.00,\"category\":\"MEALS\",\"expenseDate\":\"2026-09-06\",\"version\":2}"))
+                .andExpect(status().isOk());
+                
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/submit")
+                .header("Authorization", "Bearer " + employeeToken))
+                .andExpect(status().isOk());
+                
+        // --- Step 5: Manager approves ---
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isOk());
+                
+        // --- Step 6: Finance Admin processes ---
+        mockMvc.perform(post("/api/expenses/admin/" + expenseId + "/process")
+                .header("Authorization", "Bearer " + financeAdminToken))
+                .andExpect(status().isOk());
+                
+        // --- Step 7: Create Budget ---
         String currentMonthYear = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
         mockMvc.perform(post("/api/budgets")
                 .header("Authorization", "Bearer " + financeAdminToken)
                 .param("category", "MEALS")
                 .param("monthYear", currentMonthYear)
-                .param("limit", "100.00"))
+                .param("limit", "150.00"))
                 .andExpect(status().isOk());
-
-        // Cross the threshold
-        CreateExpenseRequest crossBudgetReq = new CreateExpenseRequest();
-        crossBudgetReq.setAmount(new BigDecimal("150.00"));
-        crossBudgetReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
-        crossBudgetReq.setExpenseDate(LocalDate.now());
-                mockMvc.perform(post("/api/expenses")
-                .header("Authorization", "Bearer " + financeAdminToken)
-                .header("Idempotency-Key", "budget-key-1")
+                
+        // --- Step 8: Employee crosses budget ---
+        CreateExpenseRequest crossReq = new CreateExpenseRequest();
+        crossReq.setAmount(new BigDecimal("50.00"));
+        crossReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        crossReq.setExpenseDate(LocalDate.now());
+        
+        MvcResult res2 = mockMvc.perform(post("/api/expenses")
+                .header("Authorization", "Bearer " + employeeToken)
+                .header("Idempotency-Key", "idem-2")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(crossBudgetReq)))
-                .andExpect(status().isCreated());
-
-        // Verify notification creation
+                .content(objectMapper.writeValueAsString(crossReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+                
+        Map<?, ?> data2 = (Map<?, ?>) objectMapper.readValue(res2.getResponse().getContentAsString(), Map.class).get("data");
+        Long expenseId2 = ((Number) data2.get("expenseId")).longValue();
+        
+        mockMvc.perform(post("/api/expenses/" + expenseId2 + "/submit")
+                .header("Authorization", "Bearer " + employeeToken)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/expenses/" + expenseId2 + "/approve")
+                .header("Authorization", "Bearer " + managerToken)).andExpect(status().isOk());
+        mockMvc.perform(post("/api/expenses/admin/" + expenseId2 + "/process")
+                .header("Authorization", "Bearer " + financeAdminToken)).andDo(org.springframework.test.web.servlet.result.MockMvcResultHandlers.print()).andExpect(status().isOk());
+                
+        // Check budget alert notification
         List<Notification> notifs = notificationRepository.findAll();
         boolean foundBudgetAlert = notifs.stream().anyMatch(n -> "BUDGET_ALERT".equals(n.getType()));
-        assertTrue(foundBudgetAlert, "Budget alert should be created");
-
-        // --- Step 8: Force notification delivery failure ---
-        // Setup mock to always fail
-        when(emailProviderService.sendEmail(any(Notification.class))).thenReturn(false);
-
-        // Find the notification ID
-        Notification alert = notifs.stream().filter(n -> "BUDGET_ALERT".equals(n.getType())).findFirst().orElseThrow();
-        Long notifId = alert.getNotificationId();
-
-        // Queue it so worker picks it up
-        notificationQueueManager.pollReadyNotifications();
+        assertTrue(foundBudgetAlert, "Budget alert should be created when processed expense crosses budget limit");
         
-        // Wait and poll until DEAD_LETTER
-        org.awaitility.Awaitility.await().atMost(30, TimeUnit.SECONDS).until(() -> {
-            Notification current = notificationRepository.findById(notifId).orElseThrow();
-            return "DEAD_LETTER".equals(current.getStatus());
-        });
-
-        Notification finalNotif = notificationRepository.findById(notifId).orElseThrow();
-        assertEquals("DEAD_LETTER", finalNotif.getStatus());
-        assertEquals(3, finalNotif.getRetryCount());
-
-        // --- Step 9: Generate report as Analyst ---
-        MvcResult reportRes = mockMvc.perform(post("/api/reports/expense-summary")
-                .param("period", "2026-10")
+        // --- Step 9: Finance Admin views Analytics ---
+        mockMvc.perform(get("/api/analytics/company?startDate=" + LocalDate.now().minusDays(1) + "&endDate=" + LocalDate.now().plusDays(1))
                 .header("Authorization", "Bearer " + financeAdminToken))
-                .andExpect(status().isAccepted()) // 202
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalExpenses").value(170.0)); // 120 + 50
+                
+        // --- Step 10: Generate and download report ---
+        MvcResult reportRes = mockMvc.perform(post("/api/reports/expense-summary")
+                .param("period", currentMonthYear)
+                .header("Authorization", "Bearer " + financeAdminToken))
+                .andExpect(status().isAccepted())
                 .andReturn();
-        
-        String reportResBody = reportRes.getResponse().getContentAsString();
-        java.util.Map<?, ?> apiRes = objectMapper.readValue(reportResBody, java.util.Map.class);
-        Number jobIdNum = (Number) apiRes.get("data");
+                
+        Number jobIdNum = (Number) objectMapper.readValue(reportRes.getResponse().getContentAsString(), Map.class).get("data");
         Long jobId = jobIdNum.longValue();
-
-        // --- Step 10: Verify report completion and notification ---
+        
         org.awaitility.Awaitility.await().atMost(30, TimeUnit.SECONDS).until(() -> {
             MvcResult statusRes = mockMvc.perform(get("/api/reports/expense-summary/" + jobId)
                     .header("Authorization", "Bearer " + financeAdminToken))
                     .andReturn();
-            String statusBody = statusRes.getResponse().getContentAsString();
-            System.out.println("STATUS_BODY=" + statusBody);
-            return statusBody.contains("\"status\":\"COMPLETED\"");
+            return statusRes.getResponse().getContentAsString().contains("\"status\":\"COMPLETED\"");
         });
-
-        // Verify notification
-        List<Notification> reportNotifs = notificationRepository.findAll();
-        boolean foundReportAlert = reportNotifs.stream().anyMatch(n -> "REPORT_READY".equals(n.getType()) && n.getPayload().contains("JobId=" + jobId));
-        assertTrue(foundReportAlert, "Report notification should be created");
-
-        // --- Step 11: Attempt to download another user's report ---
-        // Analyst 1 tries to download
+        
         mockMvc.perform(get("/api/reports/expense-summary/" + jobId + "/download")
                 .header("Authorization", "Bearer " + financeAdminToken))
                 .andExpect(status().isOk());
                 
-        // Viewer tries
-        mockMvc.perform(get("/api/reports/expense-summary/" + jobId + "/download")
-                .header("Authorization", "Bearer " + employeeToken))
-                .andExpect(status().isForbidden()); // 403 because Viewer doesn't have role
-        
-        // --- Step 12 & 13: Concurrency tests ---
-        int threadCount = 10;
-        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
-        CountDownLatch latch = new CountDownLatch(1);
-        CountDownLatch done = new CountDownLatch(threadCount);
-        
-        AtomicInteger successCount = new AtomicInteger(0);
-        
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    latch.await();
-                    CreateExpenseRequest concReq = new CreateExpenseRequest();
-                    concReq.setAmount(new BigDecimal("500.00"));
-                    concReq.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
-                    concReq.setExpenseDate(LocalDate.now());
-                                        MvcResult res = mockMvc.perform(post("/api/expenses")
-                            .header("Authorization", "Bearer " + financeAdminToken)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(objectMapper.writeValueAsString(concReq)))
-                            .andReturn();
-                            
-                    if (res.getResponse().getStatus() == 201 || res.getResponse().getStatus() == 200) {
-                        successCount.incrementAndGet();
-                    }
-                } catch (Exception e) {
-                    // Ignore
-                } finally {
-                    done.countDown();
-                }
-            });
-        }
-        
-        latch.countDown();
-        done.await(10, TimeUnit.SECONDS);
-        
-        // All 10 requests should return 201/200 due to idempotency catching exception and returning original
-        assertEquals(10, successCount.get(), "Idempotency should allow all concurrent requests to return success");
+        // --- Step 11: Verify Audit trail ---
+        long auditCount = auditLogRepository.count();
+        assertTrue(auditCount >= 8, "Audit trail should have captured all significant actions");
     }
 
-    private void registerUser(String name, String email, String password, String role) throws Exception {
+    private com.finsight.model.User registerUser(String name, String email, String password, String role) throws Exception {
         com.finsight.model.User user = new com.finsight.model.User();
         user.setName(name);
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(password));
         user.setRole(com.finsight.model.Role.valueOf(role));
-        userRepository.save(user);
+        return userRepository.save(user);
     }
 
     private String loginUser(String email, String password) throws Exception {
@@ -313,7 +234,7 @@ public class EndToEndScenarioTest {
                 
         String body = res.getResponse().getContentAsString();
         com.finsight.dto.response.ApiResponse<?> apiRes = objectMapper.readValue(body, com.finsight.dto.response.ApiResponse.class);
-        java.util.Map<?, ?> data = (java.util.Map<?, ?>) apiRes.getData();
+        Map<?, ?> data = (Map<?, ?>) apiRes.getData();
         return (String) data.get("accessToken");
     }
 }

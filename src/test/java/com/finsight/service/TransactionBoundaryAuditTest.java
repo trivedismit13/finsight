@@ -49,7 +49,7 @@ class TransactionBoundaryAuditTest {
     private UserRepository userRepository;
 
     @Autowired
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
 
     @Autowired
     private ReportJobRepository reportJobRepository;
@@ -84,7 +84,7 @@ class TransactionBoundaryAuditTest {
 
         var response = expenseService.createExpense(req, "TEST_KEY", testUser.getUserId());
 
-        assertTrue(recordRepository.findById(response.getExpenseId()).isPresent(), "Record must be saved");
+        assertTrue(expenseRepository.findById(response.getExpenseId()).isPresent(), "Expense must be saved");
         assertTrue(auditLogRepository.findAll().stream()
                 .anyMatch(a -> a.getEntityId().equals(response.getExpenseId()) && "EXPENSE".equals(a.getEntityType())), 
                 "Audit log must be saved");
@@ -105,10 +105,10 @@ class TransactionBoundaryAuditTest {
         });
 
         // Verify the record was rolled back
-        long count = recordRepository.findAll().stream()
+        long count = expenseRepository.findAll().stream()
             .filter(r -> r.getAmount().compareTo(new BigDecimal("99.00")) == 0)
             .count();
-        assertEquals(0, count, "Record should be rolled back due to audit failure");
+        assertEquals(0, count, "Expense should be rolled back due to audit failure");
     }
 
     @Test

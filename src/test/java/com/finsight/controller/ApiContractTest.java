@@ -28,7 +28,7 @@ public class ApiContractTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -37,7 +37,7 @@ public class ApiContractTest {
 
     @BeforeEach
     void setUp() {
-        recordRepository.deleteAll();
+        expenseRepository.deleteAll();
 
         User testUser = userRepository.findByEmail("finance_admin@example.com").orElseGet(() -> {
             User u = new User();
@@ -53,7 +53,7 @@ public class ApiContractTest {
         r.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         r.setExpenseDate(LocalDate.now());
         r.setCreatedBy(testUser);
-        r = recordRepository.save(r);
+        r = expenseRepository.save(r);
         expenseId = r.getExpenseId();
     }
 

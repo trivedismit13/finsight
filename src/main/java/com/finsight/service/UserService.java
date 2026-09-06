@@ -39,6 +39,15 @@ public class UserService {
             throw new com.finsight.exception.InvalidRequestException("Users cannot change their own role or active status");
         }
 
+        
+        if (role == Role.EMPLOYEE && isActive && user.getManager() == null) {
+            throw new com.finsight.exception.InvalidRequestException("Active employees must have a manager assigned");
+        }
+        if (user.getRole() == Role.MANAGER && (!isActive || role != Role.MANAGER)) {
+            if (userRepository.countByManagerAndIsActiveTrue(user) > 0) {
+                throw new com.finsight.exception.InvalidRequestException("Cannot deactivate or demote a manager with active direct reports. Reassign them first.");
+            }
+        }
         user.setRole(role);
         user.setActive(isActive);
         User saved = userRepository.save(user);
@@ -62,6 +71,10 @@ public class UserService {
             throw new com.finsight.exception.InvalidRequestException("Only EMPLOYEE can be assigned a manager");
         }
 
+        
+        if (managerId == null && user.isActive()) {
+            throw new com.finsight.exception.InvalidRequestException("Cannot remove manager from an active employee");
+        }
         if (managerId != null) {
             User manager = userRepository.findById(managerId)
                     .orElseThrow(() -> new ResourceNotFoundException("Manager not found: " + managerId));

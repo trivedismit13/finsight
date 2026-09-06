@@ -39,7 +39,7 @@ import static org.mockito.ArgumentMatchers.any;
 public class FailureInjectionDbTest {
 
     @Autowired
-    private ExpenseService recordService;
+    private ExpenseService expenseService;
     
     @Autowired
     private BudgetService budgetService;
@@ -48,7 +48,7 @@ public class FailureInjectionDbTest {
     private UserRepository userRepository;
 
     @Autowired
-    private ExpenseRepository recordRepository;
+    private ExpenseRepository expenseRepository;
 
     @Autowired
     private BudgetRepository budgetRepository;
@@ -74,7 +74,7 @@ public class FailureInjectionDbTest {
     @BeforeEach
     void setUp() {
         auditLogRepository.deleteAll();
-        recordRepository.deleteAll();
+        expenseRepository.deleteAll();
         budgetRepository.deleteAll();
         notificationRepository.deleteAll();
         userRepository.deleteAll();
@@ -107,11 +107,11 @@ public class FailureInjectionDbTest {
         req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.now());
                 // The transaction should completely rollback
-        assertThrows(RuntimeException.class, () -> recordService.createExpense(req, "PARTIAL_FAIL_KEY", testUser.getUserId()));
+        assertThrows(RuntimeException.class, () -> expenseService.createExpense(req, "PARTIAL_FAIL_KEY", testUser.getUserId()));
 
         // Verify that NO partial state exists (the financial record should be gone)
-        long recordCount = recordRepository.count();
-        assertEquals(0, recordCount, "Financial record should rollback because audit failed");
+        long expenseCount = expenseRepository.count();
+        assertEquals(0, expenseCount, "Expense should rollback because audit failed");
 
         long auditCount = auditLogRepository.count();
         assertEquals(0, auditCount, "Audit log should be absent");
@@ -130,7 +130,7 @@ public class FailureInjectionDbTest {
         try {
             // Create a budget that triggers a notification
             com.finsight.model.Budget budget = new com.finsight.model.Budget();
-            budget.setCategory(com.finsight.model.ExpenseCategory.MEALS.name());
+            budget.setCategory(com.finsight.model.ExpenseCategory.MEALS);
             budget.setMonthYear("2026-08");
             budget.setBudgetAmount(new BigDecimal("50.00"));
             budget.setCreatedBy(testUser);
@@ -144,9 +144,9 @@ public class FailureInjectionDbTest {
             req.setExpenseDate(LocalDate.of(2026, 8, 1));
             
             try {
-                com.finsight.dto.response.ExpenseResponse res = recordService.createExpense(req, "PARTIAL_FAIL_KEY", testUser.getUserId());
-                recordService.submitExpense(res.getExpenseId(), testUser.getUserId());
-                recordService.approveExpense(res.getExpenseId(), testManager.getUserId());
+                com.finsight.dto.response.ExpenseResponse res = expenseService.createExpense(req, "PARTIAL_FAIL_KEY", testUser.getUserId());
+                expenseService.submitExpense(res.getExpenseId(), testUser.getUserId());
+                expenseService.approveExpense(res.getExpenseId(), testManager.getUserId());
             } catch (Exception e) {
             }
 

@@ -16,8 +16,9 @@ public class Budget {
     @Column(name = "budget_id")
     private Long budgetId;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 100)
-    private String category;
+    private ExpenseCategory category;
 
     @Column(name = "month_year", nullable = false, length = 7)
     private String monthYear; // e.g., 2026-08

@@ -12,9 +12,9 @@ import java.util.List;
 @Repository
 public interface DashboardRepository extends JpaRepository<Expense, Long> {
 
-    @Query("SELECT COALESCE(SUM(r.amount), 0) FROM Expense r WHERE r.isDeleted = false AND r.status IN ('APPROVED', 'PROCESSED') AND r.expenseDate >= :startDate AND r.expenseDate < :endDate")
+    @Query("SELECT COALESCE(SUM(r.amount), 0) FROM Expense r WHERE r.isDeleted = false AND r.status IN ('APPROVED', 'PROCESSED') AND r.expenseDate >= :startDate AND r.expenseDate <= :endDate")
     java.math.BigDecimal getTotalCompanyExpenses(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT r.category, SUM(r.amount) FROM Expense r WHERE r.isDeleted = false AND r.status IN ('APPROVED', 'PROCESSED') AND r.expenseDate >= :startDate AND r.expenseDate < :endDate GROUP BY r.category")
+    @Query("SELECT r.category, SUM(r.amount) FROM Expense r WHERE r.isDeleted = false AND r.status IN ('APPROVED', 'PROCESSED') AND r.expenseDate >= :startDate AND r.expenseDate <= :endDate GROUP BY r.category")
     List<Object[]> getCompanyCategoryBreakdown(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }

@@ -25,7 +25,7 @@ public class BudgetController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<com.finsight.dto.response.BudgetResponse>> setBudget(
-            @RequestParam String category,
+            @RequestParam com.finsight.model.ExpenseCategory category,
             @RequestParam String monthYear,
             @RequestParam BigDecimal limit,
             @AuthenticationPrincipal UserDetails principal) {
@@ -33,7 +33,7 @@ public class BudgetController {
         Budget budget = budgetService.createOrUpdateBudget(adminId, category, monthYear, limit);
         com.finsight.dto.response.BudgetResponse response = com.finsight.dto.response.BudgetResponse.builder()
                 .budgetId(budget.getBudgetId())
-                .category(budget.getCategory())
+                .category(budget.getCategory().name())
                 .monthYear(budget.getMonthYear())
                 .budgetAmount(budget.getBudgetAmount())
                 .isAlertSent(budget.isAlertSent())

@@ -28,13 +28,13 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 public class ExpenseServiceTest {
 
-    @Mock private ExpenseRepository recordRepository;
+    @Mock private ExpenseRepository expenseRepository;
     @Mock private UserRepository userRepository;
     @Mock private AuditLogService auditLogService;
     @Mock private BudgetService budgetService;
 
     @InjectMocks
-    private ExpenseService recordService;
+    private ExpenseService expenseService;
 
     private User testUser;
 
@@ -43,7 +43,7 @@ public class ExpenseServiceTest {
         testUser = new User();
         testUser.setUserId(1L);
         testUser.setName("Test Admin");
-        org.springframework.test.util.ReflectionTestUtils.setField(recordService, "self", recordService);
+        org.springframework.test.util.ReflectionTestUtils.setField(expenseService, "self", expenseService);
     }
 
     /**
@@ -55,23 +55,23 @@ public class ExpenseServiceTest {
      */
     @Test
     void testConcurrentUpdate_optimisticLock_secondWriterGetsConflict() {
-        Expense record = new Expense();
-        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
-        record.setExpenseId(10L);
-        record.setVersion(1L); // DB is at version 1 (first writer already committed)
-        record.setCreatedBy(testUser);
+        Expense expense = new Expense();
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setExpenseId(10L);
+        expense.setVersion(1L); // DB is at version 1 (first writer already committed)
+        expense.setCreatedBy(testUser);
 
-        when(recordRepository.findByIdAndIsDeletedFalse(10L)).thenReturn(Optional.of(record));
+        when(expenseRepository.findByIdAndIsDeletedFalse(10L)).thenReturn(Optional.of(expense));
 
         UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(0L); // Client still has the old version=0
 
         // Should throw because 1 (DB) != 0 (client)
         assertThrows(OptimisticLockingFailureException.class,
-                () -> recordService.updateExpense(10L, req, 1L));
+                () -> expenseService.updateExpense(10L, req, 1L));
 
         // The record should NOT have been saved
-        verify(recordRepository, never()).save(any());
+        verify(expenseRepository, never()).save(any());
     }
 
     /**
@@ -97,16 +97,16 @@ public class ExpenseServiceTest {
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         // First call: key not found (race window); save throws; second lookup finds it
-        when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
+        when(expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.empty())       // initial check
                 .thenReturn(Optional.of(existing)); // after DataIntegrityViolationException
-        when(recordRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+        when(expenseRepository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
-        ExpenseResponse result = recordService.createExpense(req, key, 1L);
+        ExpenseResponse result = expenseService.createExpense(req, key, 1L);
 
         assertEquals(99L, result.getExpenseId());
         // Only one save attempt was made
-        verify(recordRepository, times(1)).saveAndFlush(any(Expense.class));
+        verify(expenseRepository, times(1)).saveAndFlush(any(Expense.class));
     }
 
     /**
@@ -116,16 +116,16 @@ public class ExpenseServiceTest {
      */
     @Test
     void testUpdateRecord_matchingVersion_succeeds() {
-        Expense record = new Expense();
-        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
-        record.setExpenseId(5L);
-        record.setVersion(2L);
-        record.setCreatedBy(testUser);
-        record.setAmount(BigDecimal.valueOf(100));
-        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        Expense expense = new Expense();
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setExpenseId(5L);
+        expense.setVersion(2L);
+        expense.setCreatedBy(testUser);
+        expense.setAmount(BigDecimal.valueOf(100));
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
 
-        when(recordRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(record));
-        when(recordRepository.save(any())).thenReturn(record);
+        when(expenseRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(expense));
+        when(expenseRepository.save(any())).thenReturn(expense);
 
         UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(2L); // matches DB version
@@ -133,7 +133,7 @@ public class ExpenseServiceTest {
         req.setCategory(com.finsight.model.ExpenseCategory.TRANSPORT);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
-        ExpenseResponse result = recordService.updateExpense(5L, req, 1L);
+        ExpenseResponse result = expenseService.updateExpense(5L, req, 1L);
 
         assertNotNull(result);
         verify(auditLogService).record(eq(1L), eq("UPDATE_EXPENSE"), eq("EXPENSE"), eq(5L), anyString());
@@ -146,13 +146,13 @@ public class ExpenseServiceTest {
      */
     @Test
     void testUpdateRecord_nonExistentId_throwsResourceNotFoundException() {
-        when(recordRepository.findByIdAndIsDeletedFalse(999L)).thenReturn(Optional.empty());
+        when(expenseRepository.findByIdAndIsDeletedFalse(999L)).thenReturn(Optional.empty());
 
         UpdateExpenseRequest req = new UpdateExpenseRequest();
         req.setVersion(0L);
 
         assertThrows(ResourceNotFoundException.class,
-                () -> recordService.updateExpense(999L, req, 1L));
+                () -> expenseService.updateExpense(999L, req, 1L));
     }
 
     @Test
@@ -171,13 +171,13 @@ public class ExpenseServiceTest {
         req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
-        when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
+        when(expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        ExpenseResponse result = recordService.createExpense(req, key, 1L);
+        ExpenseResponse result = expenseService.createExpense(req, key, 1L);
 
         assertEquals(100L, result.getExpenseId());
-        verify(recordRepository, never()).saveAndFlush(any());
+        verify(expenseRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -196,11 +196,11 @@ public class ExpenseServiceTest {
         req.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         req.setExpenseDate(LocalDate.of(2026, 8, 18));
 
-        when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
+        when(expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.of(existing));
 
-        assertThrows(IllegalArgumentException.class, () -> recordService.createExpense(req, key, 1L));
-        verify(recordRepository, never()).saveAndFlush(any());
+        assertThrows(IllegalArgumentException.class, () -> expenseService.createExpense(req, key, 1L));
+        verify(expenseRepository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -218,9 +218,9 @@ public class ExpenseServiceTest {
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(userRepository.findById(2L)).thenReturn(Optional.of(userB));
         
-        when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
+        when(expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(1L, key))
                 .thenReturn(Optional.empty());
-        when(recordRepository.findByCreatedBy_UserIdAndIdempotencyKey(2L, key))
+        when(expenseRepository.findByCreatedBy_UserIdAndIdempotencyKey(2L, key))
                 .thenReturn(Optional.empty());
 
         Expense saved1 = new Expense();
@@ -237,7 +237,7 @@ public class ExpenseServiceTest {
         saved2.setCategory(com.finsight.model.ExpenseCategory.OTHER);
         saved2.setExpenseDate(LocalDate.now());
 
-        when(recordRepository.saveAndFlush(any(Expense.class))).thenAnswer(invocation -> {
+        when(expenseRepository.saveAndFlush(any(Expense.class))).thenAnswer(invocation -> {
             Expense f = invocation.getArgument(0);
             if (f != null && f.getCreatedBy() != null && f.getCreatedBy().getUserId().equals(1L)) {
                 return saved1;
@@ -245,27 +245,27 @@ public class ExpenseServiceTest {
             return saved2;
         });
 
-        ExpenseResponse result1 = recordService.createExpense(req, key, 1L);
-        ExpenseResponse result2 = recordService.createExpense(req, key, 2L);
+        ExpenseResponse result1 = expenseService.createExpense(req, key, 1L);
+        ExpenseResponse result2 = expenseService.createExpense(req, key, 2L);
 
         assertEquals(101L, result1.getExpenseId());
         assertEquals(102L, result2.getExpenseId());
-        verify(recordRepository, times(2)).saveAndFlush(any(Expense.class));
+        verify(expenseRepository, times(2)).saveAndFlush(any(Expense.class));
     }
 
     @Test
     void testDeleteRecord_auditsAction() {
-        Expense record = new Expense();
-        record.setCategory(com.finsight.model.ExpenseCategory.MEALS);
-        record.setExpenseId(5L);
-        record.setCreatedBy(testUser);
+        Expense expense = new Expense();
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setExpenseId(5L);
+        expense.setCreatedBy(testUser);
 
-        when(recordRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(record));
+        when(expenseRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(expense));
 
-        recordService.deleteExpense(5L, 1L);
+        expenseService.deleteExpense(5L, 1L);
 
-        assertTrue(record.isDeleted());
-        verify(recordRepository).save(record);
-        verify(auditLogService).record(eq(1L), eq("DELETE_EXPENSE"), eq("EXPENSE"), eq(5L), eq("Deleted record: 5"));
+        assertTrue(expense.isDeleted());
+        verify(expenseRepository).save(expense);
+        verify(auditLogService).record(eq(1L), eq("DELETE_EXPENSE"), eq("EXPENSE"), eq(5L), eq("Deleted expense: 5"));
     }
 }

@@ -144,7 +144,7 @@ public class ReportExportService {
             Role userRole = requestedBy.getRole();
             java.time.YearMonth ym = java.time.YearMonth.parse(job.getPeriod());
             java.time.LocalDate startDate = ym.atDay(1);
-            java.time.LocalDate endDateExclusive = ym.plusMonths(1).atDay(1);
+            java.time.LocalDate endDate = ym.plusMonths(1).atDay(1);
 
             try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
                 writer.write("Expense ID,Date,Status,Category,Amount,Currency,Description\n");
@@ -154,7 +154,7 @@ public class ReportExportService {
                 org.springframework.data.domain.Slice<Expense> slice;
 
                 do {
-                    slice = self.fetchAndWriteReportChunk(startDate, endDateExclusive, pageable, writer);
+                    slice = self.fetchAndWriteReportChunk(startDate, endDate, pageable, writer);
                     pageable = slice.nextPageable();
                 } while (slice.hasNext());
             }
@@ -190,10 +190,10 @@ public class ReportExportService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true, propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public org.springframework.data.domain.Slice<Expense> fetchAndWriteReportChunk(
-            java.time.LocalDate startDate, java.time.LocalDate endDateExclusive,
+            java.time.LocalDate startDate, java.time.LocalDate endDate,
             org.springframework.data.domain.Pageable pageable, java.io.Writer writer) throws java.io.IOException {
 
-        org.springframework.data.domain.Slice<Expense> slice = expenseRepository.findAllByDateRange(startDate, endDateExclusive, pageable);
+        org.springframework.data.domain.Slice<Expense> slice = expenseRepository.findAllByDateRange(startDate, endDate, pageable);
 
         for (Expense record : slice.getContent()) {
             writer.write(String.format("%s,%s,%s,%s,%s,%s,%s\n",

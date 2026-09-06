@@ -36,7 +36,7 @@ public class BudgetService {
         // Reset alert state if the limit is increased or total spending is now within budget
         java.time.YearMonth ym = java.time.YearMonth.parse(monthYear);
         java.time.LocalDate startDate = ym.atDay(1);
-        java.time.LocalDate endDate = ym.plusMonths(1).atDay(1);
+        java.time.LocalDate endDate = ym.atEndOfMonth();
         BigDecimal totalSpent = expenseRepository.sumExpensesByCategoryAndDateRange(category, startDate, endDate);
         if (totalSpent.compareTo(limit) <= 0) {
             budget.setAlertSent(false);
@@ -57,7 +57,7 @@ public class BudgetService {
     public void checkBudgetExceeded(Budget budget, Long notifyUserId) {
         java.time.YearMonth ym = java.time.YearMonth.parse(budget.getMonthYear());
         java.time.LocalDate startDate = ym.atDay(1);
-        java.time.LocalDate endDate = ym.plusMonths(1).atDay(1);
+        java.time.LocalDate endDate = ym.atEndOfMonth();
         BigDecimal totalSpent = expenseRepository.sumExpensesByCategoryAndDateRange(budget.getCategory(), startDate, endDate);
         if (totalSpent.compareTo(budget.getBudgetAmount()) > 0) {
             // Use atomic update to prevent duplicate alerts from concurrent expenses

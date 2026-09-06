@@ -116,4 +116,30 @@ public class BudgetServiceTest {
         assertFalse(updated.isAlertSent()); // Because 150 <= 200, state resets
         assertEquals(new BigDecimal("200.00"), updated.getBudgetAmount());
     }
+
+    @Test
+    void testCheckBudgetExceeded_DateBoundariesAreCorrect() {
+        testBudget.setMonthYear("2026-08");
+        when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
+                .thenReturn(new BigDecimal("50.00"));
+
+        budgetService.checkBudgetExceeded(testBudget, 1L);
+
+        org.mockito.ArgumentCaptor<java.time.LocalDate> startCaptor = org.mockito.ArgumentCaptor.forClass(java.time.LocalDate.class);
+        org.mockito.ArgumentCaptor<java.time.LocalDate> endCaptor = org.mockito.ArgumentCaptor.forClass(java.time.LocalDate.class);
+
+        verify(expenseRepository).sumExpensesByCategoryAndDateRange(
+                eq(com.finsight.model.ExpenseCategory.MEALS),
+                startCaptor.capture(),
+                endCaptor.capture()
+        );
+
+        java.time.LocalDate capturedStart = startCaptor.getValue();
+        java.time.LocalDate capturedEnd = endCaptor.getValue();
+
+        assertEquals(java.time.LocalDate.of(2026, 8, 1), capturedStart, "Start date should be included (Aug 1)");
+        assertEquals(java.time.LocalDate.of(2026, 8, 31), capturedEnd, "End date should be included (Aug 31)");
+        assertNotEquals(java.time.LocalDate.of(2026, 9, 1), capturedEnd, "September 1 should be excluded");
+        assertNotEquals(java.time.LocalDate.of(2026, 7, 31), capturedStart, "July 31 should be excluded");
+    }
 }

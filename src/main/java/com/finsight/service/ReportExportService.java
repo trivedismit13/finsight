@@ -144,7 +144,7 @@ public class ReportExportService {
             Role userRole = requestedBy.getRole();
             java.time.YearMonth ym = java.time.YearMonth.parse(job.getPeriod());
             java.time.LocalDate startDate = ym.atDay(1);
-            java.time.LocalDate endDate = ym.plusMonths(1).atDay(1);
+            java.time.LocalDate endDate = ym.atEndOfMonth();
 
             try (BufferedWriter writer = Files.newBufferedWriter(filePath)) {
                 writer.write("Expense ID,Date,Status,Category,Amount,Currency,Description\n");

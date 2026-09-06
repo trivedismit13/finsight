@@ -4,3 +4,9 @@ target/
 *.iml 
 .env 
 .env.* 
+
+# Local artifacts from AI transcript extraction
+extract_*.py
+extracted_prompt.*
+all_user_inputs.txt
+*.jsonl

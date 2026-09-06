@@ -53,6 +53,15 @@ public class EndToEndScenarioTest {
 
     @Autowired
     private com.finsight.repository.UserRepository userRepository;
+
+    @Autowired
+    private com.finsight.repository.RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private com.finsight.repository.ExpenseRepository expenseRepository;
+    
+    @Autowired
+    private com.finsight.repository.BudgetRepository budgetRepository;
     
     @Autowired
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
@@ -71,6 +80,9 @@ public class EndToEndScenarioTest {
     void setUp() throws Exception {
         notificationRepository.deleteAll();
         auditLogRepository.deleteAll();
+        refreshTokenRepository.deleteAll();
+        expenseRepository.deleteAll();
+        budgetRepository.deleteAll();
         userRepository.deleteAll();
         
         // Setup hierarchy
@@ -121,6 +133,13 @@ public class EndToEndScenarioTest {
                 .content("{\"reason\":\"Missing receipt\"}"))
                 .andExpect(status().isOk());
                 
+        // Verify rejection metadata
+        com.finsight.model.Expense rejectedExp = expenseRepository.findById(expenseId).orElseThrow();
+        assertEquals("REJECTED", rejectedExp.getStatus().name());
+        assertEquals("Missing receipt", rejectedExp.getRejectionReason());
+        assertNotNull(rejectedExp.getRejectedBy());
+        assertNotNull(rejectedExp.getRejectedAt());
+
         // --- Step 4: Employee edits and resubmits ---
         mockMvc.perform(put("/api/expenses/" + expenseId)
                 .header("Authorization", "Bearer " + employeeToken)
@@ -132,6 +151,12 @@ public class EndToEndScenarioTest {
                 .header("Authorization", "Bearer " + employeeToken))
                 .andExpect(status().isOk());
                 
+        // Verify resubmission
+        com.finsight.model.Expense resubmittedExp = expenseRepository.findById(expenseId).orElseThrow();
+        assertEquals("PENDING_APPROVAL", resubmittedExp.getStatus().name());
+        assertEquals("Missing receipt", resubmittedExp.getRejectionReason());
+        assertNotNull(resubmittedExp.getRejectedBy());
+
         // --- Step 5: Manager approves ---
         mockMvc.perform(post("/api/expenses/" + expenseId + "/approve")
                 .header("Authorization", "Bearer " + managerToken))
@@ -142,6 +167,10 @@ public class EndToEndScenarioTest {
                 .header("Authorization", "Bearer " + financeAdminToken))
                 .andExpect(status().isOk());
                 
+        // Verify final processing
+        com.finsight.model.Expense processedExp = expenseRepository.findById(expenseId).orElseThrow();
+        assertEquals("PROCESSED", processedExp.getStatus().name());
+
         // --- Step 7: Create Budget ---
         String currentMonthYear = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
         mockMvc.perform(post("/api/budgets")
@@ -205,11 +234,97 @@ public class EndToEndScenarioTest {
         
         mockMvc.perform(get("/api/reports/expense-summary/" + jobId + "/download")
                 .header("Authorization", "Bearer " + financeAdminToken))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "text/csv"));
+                
+        // --- Step 11: Verify Audit trail and Notifications ---
+        List<com.finsight.model.AuditLog> audits = auditLogRepository.findAll().stream()
+                .filter(a -> "EXPENSE".equals(a.getEntityType()) && expenseId.equals(a.getEntityId()))
+                .toList();
+        List<String> auditActions = audits.stream().map(com.finsight.model.AuditLog::getAction).toList();
+        
+        assertTrue(auditActions.containsAll(List.of(
+            "CREATE_EXPENSE", "SUBMIT_EXPENSE", "REJECT_EXPENSE", "UPDATE_EXPENSE", "APPROVE_EXPENSE", "PROCESS_EXPENSE"
+        )), "Audit log missing expected actions. Actual: " + auditActions);
+        assertEquals(2, auditActions.stream().filter(a -> "SUBMIT_EXPENSE".equals(a)).count(), "Expense should be submitted twice");
+
+        List<Notification> allNotifs = notificationRepository.findAll();
+        List<String> mainExpenseNotifTypes = allNotifs.stream()
+            .filter(n -> n.getPayload().contains(expenseId.toString()))
+            .map(Notification::getType)
+            .toList();
+            
+        assertTrue(mainExpenseNotifTypes.containsAll(List.of("EXPENSE_REJECTED", "EXPENSE_APPROVED", "EXPENSE_PROCESSED")), 
+            "Missing workflow notifications. Actual: " + mainExpenseNotifTypes);
+    }
+    
+    @Test
+    void verifyRoleBoundaries() throws Exception {
+        // Create an expense as Employee
+        CreateExpenseRequest createReq = new CreateExpenseRequest();
+        createReq.setAmount(new BigDecimal("100.00"));
+        createReq.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        createReq.setExpenseDate(LocalDate.now());
+        
+        MvcResult res1 = mockMvc.perform(post("/api/expenses")
+                .header("Authorization", "Bearer " + employeeToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+                
+        Long expenseId = ((Number) ((Map<?, ?>) objectMapper.readValue(res1.getResponse().getContentAsString(), Map.class).get("data")).get("expenseId")).longValue();
+        
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/submit")
+                .header("Authorization", "Bearer " + employeeToken))
+                .andExpect(status().isOk());
+
+        // Employee cannot approve
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + employeeToken))
+                .andExpect(status().isForbidden());
+                
+        // Employee cannot process
+        mockMvc.perform(post("/api/expenses/admin/" + expenseId + "/process")
+                .header("Authorization", "Bearer " + employeeToken))
+                .andExpect(status().isForbidden());
+                
+        // Manager cannot process
+        mockMvc.perform(post("/api/expenses/admin/" + expenseId + "/process")
+                .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isForbidden());
+                
+        // Create unrelated employee under a DIFFERENT manager
+        com.finsight.model.User otherManager = registerUser("Manager2", "manager2@finsight.com", "password", "MANAGER");
+        com.finsight.model.User otherEmployee = registerUser("Employee2", "employee2@finsight.com", "password", "EMPLOYEE");
+        otherEmployee.setManager(otherManager);
+        userRepository.save(otherEmployee);
+        
+        String otherEmployeeToken = loginUser("employee2@finsight.com", "password");
+        
+        // Other employee creates an expense
+        MvcResult resOther = mockMvc.perform(post("/api/expenses")
+                .header("Authorization", "Bearer " + otherEmployeeToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createReq)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        Long otherExpenseId = ((Number) ((Map<?, ?>) objectMapper.readValue(resOther.getResponse().getContentAsString(), Map.class).get("data")).get("expenseId")).longValue();
+
+        // Original Manager cannot see unrelated team data (using list)
+        mockMvc.perform(get("/api/expenses")
+                .header("Authorization", "Bearer " + managerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[?(@.expenseId == " + otherExpenseId + ")]").doesNotExist());
+                
+        // Finance Admin CAN process (assuming it's approved, let's approve it as the CORRECT manager)
+        mockMvc.perform(post("/api/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + managerToken))
                 .andExpect(status().isOk());
                 
-        // --- Step 11: Verify Audit trail ---
-        long auditCount = auditLogRepository.count();
-        assertTrue(auditCount >= 8, "Audit trail should have captured all significant actions");
+        mockMvc.perform(post("/api/expenses/admin/" + expenseId + "/process")
+                .header("Authorization", "Bearer " + financeAdminToken))
+                .andExpect(status().isOk());
     }
 
     private com.finsight.model.User registerUser(String name, String email, String password, String role) throws Exception {

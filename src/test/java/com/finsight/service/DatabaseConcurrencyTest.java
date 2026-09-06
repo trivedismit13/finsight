@@ -612,5 +612,137 @@ public class DatabaseConcurrencyTest {
         
         executor.shutdown();
     }
+    // Test 12 - Approve/Approve Concurrency
+    @Test
+    void testApproveApproveConcurrency() throws InterruptedException {
+        Expense expense = new Expense();
+        expense.setCreatedBy(testUser);
+        expense.setAmount(new BigDecimal("500.00"));
+        expense.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
+        expense.setExpenseDate(LocalDate.now());
+        expense.setStatus(com.finsight.model.ExpenseStatus.PENDING_APPROVAL);
+        Expense savedExpense = expenseRepository.save(expense);
+        
+        User manager = new User();
+        manager.setName("Manager");
+        manager.setEmail("manager2@example.com");
+        manager.setPassword(passwordEncoder.encode("manager-pass"));
+        manager.setRole(com.finsight.model.Role.MANAGER);
+        User savedManager = userRepository.save(manager);
+        
+        testUser.setManager(savedManager);
+        userRepository.save(testUser);
+        
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+        
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> concurrencyExceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    latch.await();
+                    expenseService.approveExpense(savedExpense.getExpenseId(), savedManager.getUserId());
+                } catch (Exception e) {
+                    concurrencyExceptions.add(e);
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        
+        latch.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        
+        Expense finalState = expenseRepository.findById(savedExpense.getExpenseId()).orElseThrow();
+        assertEquals(com.finsight.model.ExpenseStatus.APPROVED, finalState.getStatus());
+        
+        assertEquals(1, concurrencyExceptions.size(), "Exactly one transaction should fail");
+        Exception ex = concurrencyExceptions.peek();
+        boolean isValidException = ex instanceof org.springframework.orm.ObjectOptimisticLockingFailureException || ex instanceof com.finsight.exception.InvalidRequestException || ex instanceof IllegalStateException;
+        assertTrue(isValidException, "Losing request should throw a concurrency or state exception");
+        
+        long auditCount = auditLogRepository.findAll().stream()
+            .filter(a -> a.getEntityId().equals(savedExpense.getExpenseId()) && a.getAction().equals("APPROVE_EXPENSE"))
+            .count();
+        assertEquals(1, auditCount, "Exactly one approval audit event should be created");
+        
+        long notifCount = transactionTemplate.execute(status -> 
+            notificationRepository.findAll().stream()
+                .filter(n -> n.getUserId().getUserId().equals(testUser.getUserId()) && n.getPayload().contains(savedExpense.getExpenseId().toString()))
+                .count()
+        );
+        assertEquals(1, notifCount, "Exactly one approval notification should be sent");
+        
+        executor.shutdown();
+    }
 
+    // Test 13 - Reject/Reject Concurrency
+    @Test
+    void testRejectRejectConcurrency() throws InterruptedException {
+        Expense expense = new Expense();
+        expense.setCreatedBy(testUser);
+        expense.setAmount(new BigDecimal("500.00"));
+        expense.setCategory(com.finsight.model.ExpenseCategory.TRAVEL);
+        expense.setExpenseDate(LocalDate.now());
+        expense.setStatus(com.finsight.model.ExpenseStatus.PENDING_APPROVAL);
+        Expense savedExpense = expenseRepository.save(expense);
+        
+        User manager = new User();
+        manager.setName("Manager");
+        manager.setEmail("manager3@example.com");
+        manager.setPassword(passwordEncoder.encode("manager-pass"));
+        manager.setRole(com.finsight.model.Role.MANAGER);
+        User savedManager = userRepository.save(manager);
+        
+        testUser.setManager(savedManager);
+        userRepository.save(testUser);
+        
+        int threadCount = 2;
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch latch = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threadCount);
+        
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> concurrencyExceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    latch.await();
+                    expenseService.rejectExpense(savedExpense.getExpenseId(), savedManager.getUserId(), "Reject");
+                } catch (Exception e) {
+                    concurrencyExceptions.add(e);
+                } finally {
+                    done.countDown();
+                }
+            });
+        }
+        
+        latch.countDown();
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        
+        Expense finalState = expenseRepository.findById(savedExpense.getExpenseId()).orElseThrow();
+        assertEquals(com.finsight.model.ExpenseStatus.REJECTED, finalState.getStatus());
+        
+        assertEquals(1, concurrencyExceptions.size(), "Exactly one transaction should fail");
+        Exception ex = concurrencyExceptions.peek();
+        boolean isValidException = ex instanceof org.springframework.orm.ObjectOptimisticLockingFailureException || ex instanceof com.finsight.exception.InvalidRequestException || ex instanceof IllegalStateException;
+        assertTrue(isValidException, "Losing request should throw a concurrency or state exception");
+        
+        long auditCount = auditLogRepository.findAll().stream()
+            .filter(a -> a.getEntityId().equals(savedExpense.getExpenseId()) && a.getAction().equals("REJECT_EXPENSE"))
+            .count();
+        assertEquals(1, auditCount, "Exactly one rejection audit event should be created");
+        
+        long notifCount = transactionTemplate.execute(status -> 
+            notificationRepository.findAll().stream()
+                .filter(n -> n.getUserId().getUserId().equals(testUser.getUserId()) && n.getPayload().contains(savedExpense.getExpenseId().toString()))
+                .count()
+        );
+        assertEquals(1, notifCount, "Exactly one rejection notification should be sent");
+        
+        executor.shutdown();
+    }
 }

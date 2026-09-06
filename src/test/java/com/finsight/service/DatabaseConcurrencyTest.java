@@ -178,7 +178,7 @@ public class DatabaseConcurrencyTest {
                     if (e.getCause() instanceof org.hibernate.StaleObjectStateException) {
                         lockFailureCount.incrementAndGet();
                     } else {
-                        e.printStackTrace();
+                        exceptions.add(e);
                     }
                 } finally {
                     done.countDown();
@@ -555,14 +555,17 @@ public class DatabaseConcurrencyTest {
         CountDownLatch done = new CountDownLatch(threadCount);
         
         java.util.concurrent.ConcurrentLinkedQueue<Exception> concurrencyExceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         
         // Thread 1: Approve
         executor.submit(() -> {
             try {
                 latch.await();
                 expenseService.approveExpense(savedExpense.getExpenseId(), savedManager.getUserId());
-            } catch (Exception e) {
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | com.finsight.exception.InvalidRequestException | IllegalStateException e) {
                 concurrencyExceptions.add(e);
+            } catch (Exception e) {
+                exceptions.add(e);
             } finally {
                 done.countDown();
             }
@@ -573,8 +576,10 @@ public class DatabaseConcurrencyTest {
             try {
                 latch.await();
                 expenseService.rejectExpense(savedExpense.getExpenseId(), savedManager.getUserId(), "Rejecting");
-            } catch (Exception e) {
+            } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | com.finsight.exception.InvalidRequestException | IllegalStateException e) {
                 concurrencyExceptions.add(e);
+            } catch (Exception e) {
+                exceptions.add(e);
             } finally {
                 done.countDown();
             }
@@ -608,7 +613,7 @@ public class DatabaseConcurrencyTest {
                 .count()
         );
         assertEquals(1, notifCount, "Exactly one notification should be sent to the employee");
-
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         
         executor.shutdown();
     }
@@ -639,14 +644,17 @@ public class DatabaseConcurrencyTest {
         CountDownLatch done = new CountDownLatch(threadCount);
         
         java.util.concurrent.ConcurrentLinkedQueue<Exception> concurrencyExceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
                     latch.await();
                     expenseService.approveExpense(savedExpense.getExpenseId(), savedManager.getUserId());
-                } catch (Exception e) {
+                } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | com.finsight.exception.InvalidRequestException | IllegalStateException e) {
                     concurrencyExceptions.add(e);
+                } catch (Exception e) {
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -675,6 +683,7 @@ public class DatabaseConcurrencyTest {
                 .count()
         );
         assertEquals(1, notifCount, "Exactly one approval notification should be sent");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         
         executor.shutdown();
     }
@@ -706,14 +715,17 @@ public class DatabaseConcurrencyTest {
         CountDownLatch done = new CountDownLatch(threadCount);
         
         java.util.concurrent.ConcurrentLinkedQueue<Exception> concurrencyExceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
+        java.util.concurrent.ConcurrentLinkedQueue<Exception> exceptions = new java.util.concurrent.ConcurrentLinkedQueue<>();
         
         for (int i = 0; i < threadCount; i++) {
             executor.submit(() -> {
                 try {
                     latch.await();
                     expenseService.rejectExpense(savedExpense.getExpenseId(), savedManager.getUserId(), "Reject");
-                } catch (Exception e) {
+                } catch (org.springframework.orm.ObjectOptimisticLockingFailureException | com.finsight.exception.InvalidRequestException | IllegalStateException e) {
                     concurrencyExceptions.add(e);
+                } catch (Exception e) {
+                    exceptions.add(e);
                 } finally {
                     done.countDown();
                 }
@@ -742,6 +754,7 @@ public class DatabaseConcurrencyTest {
                 .count()
         );
         assertEquals(1, notifCount, "Exactly one rejection notification should be sent");
+        assertTrue(exceptions.isEmpty(), "Test threw unexpected exceptions: " + exceptions);
         
         executor.shutdown();
     }

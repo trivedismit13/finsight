@@ -25,31 +25,31 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class ServiceSecurityTest {
 
     @Autowired
-    private ExpenseService recordService;
+    private ExpenseService expenseService;
 
     @Autowired
     private UserRepository userRepository;
 
-    private User viewerUser;
-    private User adminUser;
+    private User employeeUser;
+    private User financeAdminUser;
 
     @BeforeEach
     void setup() {
         userRepository.deleteAll();
 
-        viewerUser = new User();
-        viewerUser.setName("Viewer");
-        viewerUser.setEmail("employee@example.com");
-        viewerUser.setPassword("hashed");
-        viewerUser.setRole(Role.EMPLOYEE);
-        userRepository.save(viewerUser);
+        employeeUser = new User();
+        employeeUser.setName("Employee");
+        employeeUser.setEmail("employee@example.com");
+        employeeUser.setPassword("hashed");
+        employeeUser.setRole(Role.EMPLOYEE);
+        userRepository.save(employeeUser);
 
-        adminUser = new User();
-        adminUser.setName("Admin");
-        adminUser.setEmail("finance_admin@example.com");
-        adminUser.setPassword("hashed");
-        adminUser.setRole(Role.FINANCE_ADMIN);
-        userRepository.save(adminUser);
+        financeAdminUser = new User();
+        financeAdminUser.setName("Finance Admin");
+        financeAdminUser.setEmail("finance_admin@example.com");
+        financeAdminUser.setPassword("hashed");
+        financeAdminUser.setRole(Role.FINANCE_ADMIN);
+        userRepository.save(financeAdminUser);
     }
 
     
@@ -58,10 +58,10 @@ class ServiceSecurityTest {
 
     @Test
     @WithMockCustomUser(roles = "FINANCE_ADMIN")
-    void testAdminCanDeleteRecord_AccessDeniedNotThrown() {
-        // We might get ResourceNotFoundException because record 1L doesn't exist, but we should NOT get AccessDeniedException
+    void testFinanceAdminCanDeleteExpense_AccessDeniedNotThrown() {
+        // We might get ResourceNotFoundException because expense 1L doesn't exist, but we should NOT get AccessDeniedException
         assertThrows(com.finsight.exception.ResourceNotFoundException.class, () -> {
-            recordService.deleteExpense(1L, adminUser.getUserId());
+            expenseService.deleteExpense(1L, financeAdminUser.getUserId());
         });
     }
 
@@ -73,7 +73,7 @@ class ServiceSecurityTest {
         req.setExpenseDate(LocalDate.now());
 
         assertThrows(com.finsight.exception.ResourceNotFoundException.class, () -> {
-            recordService.createExpense(req, "TEST_KEY", 1L);
+            expenseService.createExpense(req, "TEST_KEY", 9999L);
         });
     }
 }

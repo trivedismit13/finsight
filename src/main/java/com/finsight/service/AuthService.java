@@ -36,6 +36,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final SecurityLockoutConfig securityLockoutConfig;
     private final RefreshTokenConfig refreshTokenConfig;
+    private final org.springframework.context.ApplicationContext applicationContext;
 
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -137,7 +138,7 @@ public class AuthService {
             }
             // If not expired, it means it was already consumed (revoked = true).
             // THEFT SIGNAL: this token was already rotated out; someone replayed it
-            revokeAllTokensForUser(token.getUser());
+            applicationContext.getBean(AuthService.class).revokeAllTokensForUser(token.getUser());
             throw new InvalidRefreshTokenException("Session invalidated, please log in again");
         }
 
@@ -164,7 +165,7 @@ public class AuthService {
         });
     }
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void revokeAllTokensForUser(User user) {
         List<RefreshToken> activeTokens = refreshTokenRepository.findAllByUser_UserIdAndRevokedFalse(user.getUserId());
         for (RefreshToken rt : activeTokens) {

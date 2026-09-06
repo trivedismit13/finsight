@@ -37,6 +37,7 @@ class AuthServiceTest {
     @Mock private JwtUtil jwtUtil;
     @Mock private com.finsight.config.SecurityLockoutConfig securityLockoutConfig;
     @Mock private com.finsight.config.RefreshTokenConfig refreshTokenConfig;
+    @Mock private org.springframework.context.ApplicationContext applicationContext;
 
     @InjectMocks
     private AuthService authService;
@@ -195,6 +196,8 @@ class AuthServiceTest {
 
         RefreshTokenRequest req = new RefreshTokenRequest();
         req.setRefreshToken(rawToken);
+        
+        when(applicationContext.getBean(AuthService.class)).thenReturn(authService);
 
         assertThrows(InvalidRefreshTokenException.class, () -> authService.refreshAccessToken(req));
 

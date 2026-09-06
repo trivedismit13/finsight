@@ -3,8 +3,10 @@
 -- Rename table
 RENAME TABLE financial_records TO expenses;
 
--- Add new columns
+-- Add new columns and rename old ones
 ALTER TABLE expenses 
+    CHANGE COLUMN record_id expense_id BIGINT AUTO_INCREMENT,
+    CHANGE COLUMN record_date expense_date DATE NOT NULL,
     ADD COLUMN currency VARCHAR(3) NOT NULL DEFAULT 'INR',
     ADD COLUMN status VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
     ADD COLUMN submitted_at DATETIME(6),

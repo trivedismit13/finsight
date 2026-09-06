@@ -54,7 +54,7 @@ public class ExpenseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> create(
             @Valid @RequestBody CreateExpenseRequest req,
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
@@ -66,7 +66,7 @@ public class ExpenseController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody UpdateExpenseRequest req,
@@ -77,7 +77,7 @@ public class ExpenseController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<Void> delete(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {
@@ -87,7 +87,7 @@ public class ExpenseController {
     }
 
     @PostMapping("/{id}/submit")
-    @PreAuthorize("hasAnyRole('EMPLOYEE', 'MANAGER', 'FINANCE_ADMIN')")
+    @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<ApiResponse<ExpenseResponse>> submit(
             @PathVariable Long id,
             @AuthenticationPrincipal UserDetails principal) {

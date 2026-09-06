@@ -20,18 +20,26 @@ public class BudgetService {
     private final UserRepository userRepository;
     private final ExpenseRepository expenseRepository;
     private final NotificationDispatcherService notificationDispatcherService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     @PreAuthorize("hasRole('FINANCE_ADMIN')")
     public Budget createOrUpdateBudget(Long adminId, com.finsight.model.ExpenseCategory category, String monthYear, BigDecimal limit) {
         User admin = userRepository.findById(adminId).orElseThrow();
-        Budget budget = budgetRepository.findByCategoryAndMonthYear(category, monthYear)
-                .orElse(new Budget());
+        boolean isNew = false;
+        Budget budget = budgetRepository.findByCategoryAndMonthYear(category, monthYear).orElse(null);
+        BigDecimal oldAmount = BigDecimal.ZERO;
+        if (budget == null) {
+            budget = new Budget();
+            isNew = true;
+            budget.setCreatedBy(admin);
+        } else {
+            oldAmount = budget.getBudgetAmount();
+        }
 
         budget.setCategory(category);
         budget.setMonthYear(monthYear);
         budget.setBudgetAmount(limit);
-        budget.setCreatedBy(admin);
 
         // Reset alert state if the limit is increased or total spending is now within budget
         java.time.YearMonth ym = java.time.YearMonth.parse(monthYear);
@@ -44,8 +52,16 @@ public class BudgetService {
 
         budget = budgetRepository.save(budget);
 
+        if (isNew) {
+            auditLogService.record(adminId, "CREATE_BUDGET", "BUDGET", budget.getBudgetId(),
+                    String.format("Created budget for %s/%s: limit %.2f", category, monthYear, limit));
+        } else {
+            auditLogService.record(adminId, "UPDATE_BUDGET", "BUDGET", budget.getBudgetId(),
+                    String.format("Updated budget for %s/%s from %.2f to %.2f", category, monthYear, oldAmount, limit));
+        }
+
         // Trigger alert check after save
-        checkBudgetExceeded(budget, admin.getUserId());
+        checkBudgetExceeded(budget);
 
         return budget;
     }
@@ -54,7 +70,7 @@ public class BudgetService {
      * Checks whether actual spending for the given category/month exceeds the budget.
      * Called both after budget creation and after every new EXPENSE record is created.
      */
-    public void checkBudgetExceeded(Budget budget, Long notifyUserId) {
+    public void checkBudgetExceeded(Budget budget) {
         java.time.YearMonth ym = java.time.YearMonth.parse(budget.getMonthYear());
         java.time.LocalDate startDate = ym.atDay(1);
         java.time.LocalDate endDate = ym.atEndOfMonth();
@@ -63,12 +79,15 @@ public class BudgetService {
             // Use atomic update to prevent duplicate alerts from concurrent expenses
             int updated = budgetRepository.markAlertSentIfFalse(budget.getBudgetId());
             if (updated > 0) {
-                notificationDispatcherService.enqueueNotification(
-                        notifyUserId,
-                        "BUDGET_ALERT",
-                        String.format("Budget exceeded for category '%s' in %s: spent %.2f / limit %.2f",
-                                budget.getCategory(), budget.getMonthYear(), totalSpent, budget.getBudgetAmount())
-                );
+                java.util.List<User> admins = userRepository.findByRoleAndIsActiveTrue(com.finsight.model.Role.FINANCE_ADMIN);
+                for (User adminUser : admins) {
+                    notificationDispatcherService.enqueueNotification(
+                            adminUser.getUserId(),
+                            "BUDGET_ALERT",
+                            String.format("Budget exceeded for category '%s' in %s: spent %.2f / limit %.2f",
+                                    budget.getCategory(), budget.getMonthYear(), totalSpent, budget.getBudgetAmount())
+                    );
+                }
             }
         } else {
             // Under budget (maybe an expense was deleted/lowered), reset alert state
@@ -85,10 +104,10 @@ public class BudgetService {
      * Looks up the active budget for a category/month and checks if the given spending exceeds it.
      * Triggered from ExpenseService after an EXPENSE record is created.
      */
-    public void checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory category, String monthYear, Long notifyUserId) {
+    public void checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory category, String monthYear) {
         Optional<Budget> budgetOpt = budgetRepository.findByCategoryAndMonthYear(category, monthYear);
         budgetOpt.ifPresent(budget ->
-                checkBudgetExceeded(budget, notifyUserId)
+                checkBudgetExceeded(budget)
         );
     }
 }

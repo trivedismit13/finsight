@@ -222,6 +222,24 @@ public class ExpenseService {
             throw new IllegalStateException("Only DRAFT or REJECTED expenses can be submitted.");
         }
 
+        User creator = expense.getCreatedBy();
+        if (!creator.isActive()) {
+            throw new IllegalArgumentException("Employee must be active to submit.");
+        }
+        if (creator.getRole() != Role.EMPLOYEE) {
+            throw new IllegalArgumentException("Only EMPLOYEE can submit expenses.");
+        }
+        User manager = creator.getManager();
+        if (manager == null) {
+            throw new IllegalArgumentException("Cannot submit expense: no manager assigned.");
+        }
+        if (!manager.isActive()) {
+            throw new IllegalArgumentException("Cannot submit expense: assigned manager is inactive.");
+        }
+        if (manager.getRole() != Role.MANAGER) {
+            throw new IllegalArgumentException("Cannot submit expense: assigned manager is not a MANAGER.");
+        }
+
         expense.setStatus(ExpenseStatus.PENDING_APPROVAL);
         expense.setSubmittedAt(LocalDateTime.now());
         expense = expenseRepository.save(expense);
@@ -316,8 +334,8 @@ public class ExpenseService {
         );
 
         if (expense.getCategory() != null && expense.getExpenseDate() != null) {
-            String monthYear = expense.getExpenseDate().format(DateTimeFormatter.ofPattern("yyyy-MM"));
-            budgetService.checkBudgetExceededAfterRecord(expense.getCategory(), monthYear, managerId);
+            java.time.YearMonth expenseMonth = java.time.YearMonth.from(expense.getExpenseDate());
+            budgetService.checkBudgetExceededAfterRecord(expense.getCategory(), expenseMonth.toString());
         }
 
         return toResponse(expense);

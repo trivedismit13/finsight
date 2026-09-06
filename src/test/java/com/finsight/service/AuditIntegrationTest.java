@@ -85,7 +85,7 @@ public class AuditIntegrationTest {
 
         // Force a failure in the business logic AFTER audit is called in approveExpense
         doThrow(new RuntimeException("Simulated budget error"))
-            .when(budgetService).checkBudgetExceededAfterRecord(any(com.finsight.model.ExpenseCategory.class), anyString(), anyLong());
+            .when(budgetService).checkBudgetExceededAfterRecord(any(com.finsight.model.ExpenseCategory.class), anyString());
         
         try {
             expenseService.approveExpense(res.getExpenseId(), testManager.getUserId());

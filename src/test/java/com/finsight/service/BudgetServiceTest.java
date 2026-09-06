@@ -31,6 +31,9 @@ public class BudgetServiceTest {
     @Mock
     private NotificationDispatcherService notificationDispatcherService;
 
+    @Mock
+    private AuditLogService auditLogService;
+
     @InjectMocks
     private BudgetService budgetService;
 
@@ -45,10 +48,17 @@ public class BudgetServiceTest {
         testUser.setUserId(1L);
 
         testBudget = new Budget();
+        testBudget.setBudgetId(100L);
         testBudget.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         testBudget.setMonthYear("2026-08");
         testBudget.setBudgetAmount(new BigDecimal("100.00"));
         testBudget.setAlertSent(false);
+
+        User adminUser = new User();
+        adminUser.setUserId(99L);
+        adminUser.setRole(com.finsight.model.Role.FINANCE_ADMIN);
+        when(userRepository.findByRoleAndIsActiveTrue(com.finsight.model.Role.FINANCE_ADMIN))
+                .thenReturn(java.util.Collections.singletonList(adminUser));
     }
 
     @Test
@@ -56,7 +66,7 @@ public class BudgetServiceTest {
         when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("50.00"));
 
-        budgetService.checkBudgetExceeded(testBudget, 1L);
+        budgetService.checkBudgetExceeded(testBudget);
 
         verify(notificationDispatcherService, never()).enqueueNotification(any(), any(), any());
         assertFalse(testBudget.isAlertSent());
@@ -68,9 +78,9 @@ public class BudgetServiceTest {
                 .thenReturn(new BigDecimal("150.00"));
         when(budgetRepository.markAlertSentIfFalse(testBudget.getBudgetId())).thenReturn(1);
 
-        budgetService.checkBudgetExceeded(testBudget, 1L);
+        budgetService.checkBudgetExceeded(testBudget);
 
-        verify(notificationDispatcherService, times(1)).enqueueNotification(eq(1L), eq("BUDGET_ALERT"), anyString());
+        verify(notificationDispatcherService, times(1)).enqueueNotification(eq(99L), eq("BUDGET_ALERT"), anyString());
     }
 
     @Test
@@ -80,7 +90,7 @@ public class BudgetServiceTest {
         when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("200.00")); // Still over budget
 
-        budgetService.checkBudgetExceeded(testBudget, 1L);
+        budgetService.checkBudgetExceeded(testBudget);
 
         // Should not send another notification
         verify(notificationDispatcherService, never()).enqueueNotification(any(), any(), any());
@@ -94,7 +104,7 @@ public class BudgetServiceTest {
         when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("50.00")); // Now under budget (e.g. record deleted)
 
-        budgetService.checkBudgetExceeded(testBudget, 1L);
+        budgetService.checkBudgetExceeded(testBudget);
 
         verify(notificationDispatcherService, never()).enqueueNotification(any(), any(), any());
         assertFalse(testBudget.isAlertSent()); // State should be reset
@@ -123,7 +133,7 @@ public class BudgetServiceTest {
         when(expenseRepository.sumExpensesByCategoryAndDateRange(eq(com.finsight.model.ExpenseCategory.MEALS), any(), any()))
                 .thenReturn(new BigDecimal("50.00"));
 
-        budgetService.checkBudgetExceeded(testBudget, 1L);
+        budgetService.checkBudgetExceeded(testBudget);
 
         org.mockito.ArgumentCaptor<java.time.LocalDate> startCaptor = org.mockito.ArgumentCaptor.forClass(java.time.LocalDate.class);
         org.mockito.ArgumentCaptor<java.time.LocalDate> endCaptor = org.mockito.ArgumentCaptor.forClass(java.time.LocalDate.class);

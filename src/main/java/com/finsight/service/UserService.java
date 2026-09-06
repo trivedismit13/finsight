@@ -81,6 +81,9 @@ public class UserService {
             if (manager.getRole() != Role.MANAGER) {
                 throw new com.finsight.exception.InvalidRequestException("Assigned manager must have MANAGER role");
             }
+            if (!manager.isActive()) {
+                throw new com.finsight.exception.InvalidRequestException("Assigned manager must be active");
+            }
             if (manager.getUserId().equals(user.getUserId())) {
                 throw new com.finsight.exception.InvalidRequestException("User cannot be their own manager");
             }

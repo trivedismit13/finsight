@@ -268,4 +268,82 @@ public class ExpenseServiceTest {
         verify(expenseRepository).save(expense);
         verify(auditLogService).record(eq(1L), eq("DELETE_EXPENSE"), eq("EXPENSE"), eq(5L), eq("Deleted expense: 5"));
     }
+
+    @Test
+    void testSubmitExpense_noManager_throwsException() {
+        User creator = new User();
+        creator.setUserId(1L);
+        creator.setRole(com.finsight.model.Role.EMPLOYEE);
+        creator.setActive(true);
+        creator.setManager(null); // Manager-less
+
+        Expense expense = new Expense();
+        expense.setExpenseId(5L);
+        expense.setStatus(com.finsight.model.ExpenseStatus.DRAFT);
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setAmount(java.math.BigDecimal.valueOf(100));
+        expense.setExpenseDate(java.time.LocalDate.now());
+        expense.setCreatedBy(creator);
+
+        when(expenseRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(expense));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> expenseService.submitExpense(5L, 1L));
+        assertEquals("Cannot submit expense: no manager assigned.", ex.getMessage());
+    }
+
+    @Test
+    void testSubmitExpense_inactiveManager_throwsException() {
+        User manager = new User();
+        manager.setRole(com.finsight.model.Role.MANAGER);
+        manager.setActive(false); // Inactive manager
+
+        User creator = new User();
+        creator.setUserId(1L);
+        creator.setRole(com.finsight.model.Role.EMPLOYEE);
+        creator.setActive(true);
+        creator.setManager(manager);
+
+        Expense expense = new Expense();
+        expense.setExpenseId(5L);
+        expense.setStatus(com.finsight.model.ExpenseStatus.DRAFT);
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setAmount(java.math.BigDecimal.valueOf(100));
+        expense.setExpenseDate(java.time.LocalDate.now());
+        expense.setCreatedBy(creator);
+
+        when(expenseRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(expense));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> expenseService.submitExpense(5L, 1L));
+        assertEquals("Cannot submit expense: assigned manager is inactive.", ex.getMessage());
+    }
+
+    @Test
+    void testSubmitExpense_activeManager_succeeds() {
+        User manager = new User();
+        manager.setRole(com.finsight.model.Role.MANAGER);
+        manager.setActive(true); // Active manager
+
+        User creator = new User();
+        creator.setUserId(1L);
+        creator.setRole(com.finsight.model.Role.EMPLOYEE);
+        creator.setActive(true);
+        creator.setManager(manager);
+
+        Expense expense = new Expense();
+        expense.setExpenseId(5L);
+        expense.setStatus(com.finsight.model.ExpenseStatus.DRAFT);
+        expense.setCategory(com.finsight.model.ExpenseCategory.MEALS);
+        expense.setAmount(java.math.BigDecimal.valueOf(100));
+        expense.setCurrency("USD");
+        expense.setExpenseDate(java.time.LocalDate.now());
+        expense.setCreatedBy(creator);
+
+        when(expenseRepository.findByIdAndIsDeletedFalse(5L)).thenReturn(Optional.of(expense));
+        when(expenseRepository.save(any(Expense.class))).thenReturn(expense);
+
+        ExpenseResponse response = expenseService.submitExpense(5L, 1L);
+        
+        assertEquals(com.finsight.model.ExpenseStatus.PENDING_APPROVAL.name(), response.getStatus());
+        verify(auditLogService).record(eq(1L), eq("SUBMIT_EXPENSE"), eq("EXPENSE"), eq(5L), anyString());
+    }
 }

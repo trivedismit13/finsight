@@ -198,6 +198,14 @@ public class DatabaseConcurrencyTest {
     // Test 3 — Budget alert race
     @Test
     void testBudgetAlertRace() throws InterruptedException {
+        User adminUser = new User();
+        adminUser.setName("Admin");
+        adminUser.setEmail("admin@finsight.com");
+        adminUser.setPassword("password");
+        adminUser.setRole(com.finsight.model.Role.FINANCE_ADMIN);
+        adminUser.setActive(true);
+        userRepository.save(adminUser);
+
         Budget budget = new Budget();
         budget.setCategory(com.finsight.model.ExpenseCategory.MEALS);
         budget.setMonthYear("2026-08");
@@ -228,7 +236,7 @@ public class DatabaseConcurrencyTest {
                     org.springframework.security.core.context.SecurityContextHolder.setContext(ctx);
                     latch.await();
                     transactionTemplate.executeWithoutResult(status -> {
-                        budgetService.checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory.MEALS, "2026-08", testUser.getUserId());
+                        budgetService.checkBudgetExceededAfterRecord(com.finsight.model.ExpenseCategory.MEALS, "2026-08");
                     });
                 } catch (Exception e) {
                     exceptions.add(e);
@@ -241,6 +249,8 @@ public class DatabaseConcurrencyTest {
         latch.countDown();
         assertTrue(done.await(5, TimeUnit.SECONDS));
 
+        System.out.println("FINANCE_ADMINs in DB: " + userRepository.findByRoleAndIsActiveTrue(com.finsight.model.Role.FINANCE_ADMIN).size());
+        
         Budget updatedBudget = budgetRepository.findById(budget.getBudgetId()).orElseThrow();
         assertTrue(updatedBudget.isAlertSent(), "Alert should be sent");
 

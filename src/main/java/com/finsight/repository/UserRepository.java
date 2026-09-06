@@ -14,6 +14,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     
     java.util.List<User> findByIsActiveTrue();
+    java.util.List<User> findByRoleAndIsActiveTrue(com.finsight.model.Role role);
     long countByManager(User manager);
     long countByManagerAndIsActiveTrue(User manager);
 
